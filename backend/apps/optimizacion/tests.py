@@ -7,6 +7,10 @@ from apps.problemas.models import Problema
 from apps.optimizacion.models import Ejecucion
 
 
+from django.test import SimpleTestCase
+from apps.optimizacion.services.solver import resolver_problema
+
+
 class EjecucionModelTest(TestCase):
 
     def setUp(self):
@@ -80,3 +84,95 @@ class EjecucionModelTest(TestCase):
 
         with self.assertRaises(ProtectedError):
             self.problema.delete()
+
+class SolverTest(SimpleTestCase):
+
+    def setUp(self):
+        self.productos = [
+            {"codigo": "P1", "utilidad_unitaria": 5},
+            {"codigo": "P2", "utilidad_unitaria": 8},
+        ]
+
+        self.recursos = [
+            {
+                "nombre": "Materia A",
+                "disponibilidad": 10,
+                "consumos": {"P1": 2, "P2": 4},
+            }
+        ]
+
+    def test_resolver_modelo_optimo(self):
+        resultado = resolver_problema(
+            self.productos,
+            self.recursos,
+            "MAX"
+        )
+
+        self.assertEqual(resultado["estado"], "Optimal")
+        self.assertEqual(resultado["utilidad_total"], 25)
+
+        cantidades = {
+            p["codigo"]: p["cantidad"]
+            for p in resultado["productos"]
+        }
+
+        self.assertEqual(cantidades["P1"], 5)
+        self.assertEqual(cantidades["P2"], 0)
+
+    def test_calcular_consumo_y_holgura(self):
+        resultado = resolver_problema(
+            self.productos,
+            self.recursos,
+            "MAX"
+        )
+
+        recurso = resultado["recursos"][0]
+
+        self.assertEqual(recurso["consumo_total"], 10)
+        self.assertEqual(recurso["holgura"], 0)
+        self.assertEqual(recurso["estado_uso"], "AGOTADO")
+
+    def test_rechazar_productos_vacios(self):
+        with self.assertRaises(ValueError):
+            resolver_problema([], self.recursos)
+
+    def test_rechazar_recursos_vacios(self):
+        with self.assertRaises(ValueError):
+            resolver_problema(self.productos, [])
+
+    def test_rechazar_sentido_invalido(self):
+        with self.assertRaises(ValueError):
+            resolver_problema(
+                self.productos,
+                self.recursos,
+                "OTRO"
+            )
+
+    def test_rechazar_utilidad_negativa(self):
+        productos = [
+            {"codigo": "P1", "utilidad_unitaria": -5}
+        ]
+
+        with self.assertRaises(ValueError):
+            resolver_problema(productos, self.recursos)
+
+    def test_rechazar_disponibilidad_negativa(self):
+        recursos = [
+            {
+                "nombre": "Materia A",
+                "disponibilidad": -10,
+                "consumos": {"P1": 2, "P2": 4},
+            }
+        ]
+
+        with self.assertRaises(ValueError):
+            resolver_problema(self.productos, recursos)
+
+    def test_rechazar_codigos_duplicados(self):
+        productos = [
+            {"codigo": "P1", "utilidad_unitaria": 5},
+            {"codigo": "P1", "utilidad_unitaria": 8},
+        ]
+
+        with self.assertRaises(ValueError):
+            resolver_problema(productos, self.recursos)
