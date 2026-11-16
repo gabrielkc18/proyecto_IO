@@ -1,0 +1,96 @@
+
+from decimal import Decimal
+
+from rest_framework.test import APITestCase
+from rest_framework import status
+
+from apps.problemas.models import Problema
+from apps.productos.models import Producto
+from apps.recursos.models import Recurso, ConsumoRecurso
+from apps.optimizacion.models import Ejecucion
+
+
+class EjecutarOptimizacionAPITests(APITestCase):
+
+    def setUp(self):
+        self.problema = Problema.objects.create(
+            nombre="Problema API",
+            sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
+            estado=Problema.Estado.LISTO,
+        )
+
+        self.producto = Producto.objects.create(
+            problema=self.problema,
+            codigo="P1",
+            nombre="Producto 1",
+            utilidad_unitaria=Decimal("5.00"),
+        )
+
+        self.recurso = Recurso.objects.create(
+            problema=self.problema,
+            nombre="Recurso A",
+            unidad_medida="kg",
+            disponibilidad=Decimal("10.00"),
+        )
+
+        ConsumoRecurso.objects.create(
+            producto=self.producto,
+            recurso=self.recurso,
+            cantidad_por_unidad=Decimal("2.0000"),
+        )
+
+        self.url = f"/api/problemas/{self.problema.id}/ejecutar/"
+
+    def test_problema_inexistente_responde_404(self):
+        response = self.client.post(
+            "/api/problemas/99999/ejecutar/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+        self.assertEqual(Ejecucion.objects.count(), 0)
+
+    def test_problema_borrador_responde_400(self):
+        self.problema.estado = Problema.Estado.BORRADOR
+        self.problema.save()
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(Ejecucion.objects.count(), 0)
+
+    def test_problema_listo_ejecuta_optimizacion(self):
+        response = self.client.post(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertEqual(Ejecucion.objects.count(), 1)
+
+        ejecucion = Ejecucion.objects.get()
+
+        self.assertEqual(
+            ejecucion.estado_proceso,
+            Ejecucion.EstadoProceso.TERMINADO,
+        )
+
+        self.assertEqual(
+            ejecucion.estado_solver,
+            Ejecucion.EstadoSolver.OPTIMAL,
+        )
+
+        self.assertEqual(
+            ejecucion.utilidad_total,
+            Decimal("25.00"),
+        )
+
+        self.assertIn("id", response.data)
