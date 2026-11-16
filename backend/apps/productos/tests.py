@@ -1,16 +1,21 @@
-
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 
-from apps.problemas.models import Problema
 from apps.productos.models import Producto
+from apps.workspaces.test_utils import (
+    crear_workspace_prueba,
+    crear_problema_prueba,
+)
 
 
 class ProductoModelTest(TestCase):
 
     def setUp(self):
-        self.problema = Problema.objects.create(
-            nombre="Producción noviembre"
+        self.usuario, self.workspace = crear_workspace_prueba()
+
+        self.problema = crear_problema_prueba(
+            self.workspace,
+            nombre="Producción noviembre",
         )
 
     def test_crear_producto_correctamente(self):
@@ -18,7 +23,7 @@ class ProductoModelTest(TestCase):
             problema=self.problema,
             codigo="P1",
             nombre="Producto 1",
-            utilidad_unitaria=80
+            utilidad_unitaria=80,
         )
 
         self.assertEqual(producto.codigo, "P1")
@@ -30,36 +35,37 @@ class ProductoModelTest(TestCase):
             problema=self.problema,
             codigo="P1",
             nombre="Producto 1",
-            utilidad_unitaria=80
+            utilidad_unitaria=80,
         )
 
         duplicado = Producto(
             problema=self.problema,
             codigo="P1",
             nombre="Producto duplicado",
-            utilidad_unitaria=100
+            utilidad_unitaria=100,
         )
 
         with self.assertRaises(ValidationError):
             duplicado.full_clean()
 
     def test_mismo_codigo_permitido_en_otro_problema(self):
-        otro_problema = Problema.objects.create(
-            nombre="Producción diciembre"
+        otro_problema = crear_problema_prueba(
+            self.workspace,
+            nombre="Producción diciembre",
         )
 
         Producto.objects.create(
             problema=self.problema,
             codigo="P1",
             nombre="Producto 1",
-            utilidad_unitaria=80
+            utilidad_unitaria=80,
         )
 
         producto = Producto(
             problema=otro_problema,
             codigo="P1",
             nombre="Producto 1",
-            utilidad_unitaria=90
+            utilidad_unitaria=90,
         )
 
         producto.full_clean()
@@ -69,7 +75,7 @@ class ProductoModelTest(TestCase):
             problema=self.problema,
             codigo="P2",
             nombre="Producto 2",
-            utilidad_unitaria=-50
+            utilidad_unitaria=-50,
         )
 
         with self.assertRaises(ValidationError):
