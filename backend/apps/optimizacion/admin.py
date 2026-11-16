@@ -1,3 +1,19 @@
 from django.contrib import admin
+from .models import Ejecucion
 
-# Register your models here.
+
+@admin.register(Ejecucion)
+class EjecucionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "problema",
+        "fecha_inicio",
+        "fecha_fin",
+        "estado_proceso",
+        "estado_solver",
+        "utilidad_total",
+    )
+    list_filter = ("estado_proceso", "estado_solver")
+    search_fields = ("problema__nombre", "solver_nombre")
+    list_select_related = ("problema",)
+    readonly_fields = ("fecha_inicio",)
