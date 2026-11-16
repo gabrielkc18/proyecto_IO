@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,23 +21,39 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--!%yc-#c&%#%yfl-gtr9itagm!2)lange@pbxyoadj@11w=k)d'
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1",
+    cast=Csv()
+)
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # Django apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Apps de terceros
+    'rest_framework',
+    
+    #Apps del proyecto
+    'apps.problemas.apps.ProblemasConfig',
+    'apps.productos.apps.ProductosConfig',
+    'apps.recursos.apps.RecursosConfig',
+    'apps.optimizacion.apps.OptimizacionConfig',
+    'apps.resultados.apps.ResultadosConfig',
+    'apps.inteligencia_artificial.apps.InteligenciaArtificialConfig',
 ]
 
 MIDDLEWARE = [
