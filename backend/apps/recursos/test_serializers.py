@@ -1,5 +1,6 @@
 
 from django.test import TestCase
+from apps.workspaces.test_utils import crear_workspace_prueba, crear_problema_prueba
 from apps.problemas.models import Problema
 from apps.productos.models import Producto
 from apps.recursos.models import Recurso
@@ -9,12 +10,14 @@ from apps.recursos.serializers import ConsumoRecursoSerializer
 class ConsumoRecursoSerializerTests(TestCase):
 
     def setUp(self):
-        self.problema = Problema.objects.create(
-            nombre="Problema A"
+        self.usuario, self.workspace = crear_workspace_prueba()
+
+        self.problema = crear_problema_prueba(
+            self.workspace, nombre="Problema A"
         )
 
-        self.otro_problema = Problema.objects.create(
-            nombre="Problema B"
+        self.otro_problema = crear_problema_prueba(
+            self.workspace, nombre="Problema B"
         )
 
         self.producto = Producto.objects.create(
@@ -45,7 +48,7 @@ class ConsumoRecursoSerializerTests(TestCase):
             "cantidad_por_unidad": "4.0000"
         }
 
-        serializer = ConsumoRecursoSerializer(data=data)
+        serializer = ConsumoRecursoSerializer(data=data, context={'workspace': self.workspace})
 
         self.assertTrue(
             serializer.is_valid(),
@@ -59,7 +62,7 @@ class ConsumoRecursoSerializerTests(TestCase):
             "cantidad_por_unidad": "4.0000"
         }
 
-        serializer = ConsumoRecursoSerializer(data=data)
+        serializer = ConsumoRecursoSerializer(data=data, context={'workspace': self.workspace})
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("non_field_errors", serializer.errors)
@@ -71,7 +74,7 @@ class ConsumoRecursoSerializerTests(TestCase):
             "cantidad_por_unidad": "-2.0000"
         }
 
-        serializer = ConsumoRecursoSerializer(data=data)
+        serializer = ConsumoRecursoSerializer(data=data, context={'workspace': self.workspace})
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("cantidad_por_unidad", serializer.errors)

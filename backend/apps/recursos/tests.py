@@ -2,6 +2,7 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 
+from apps.workspaces.test_utils import crear_workspace_prueba, crear_problema_prueba
 from apps.problemas.models import Problema
 from apps.productos.models import Producto
 from apps.recursos.models import Recurso, ConsumoRecurso
@@ -10,12 +11,14 @@ from apps.recursos.models import Recurso, ConsumoRecurso
 class ConsumoRecursoModelTest(TestCase):
 
     def setUp(self):
-        self.problema_a = Problema.objects.create(
-            nombre="Escenario A"
+        self.usuario, self.workspace = crear_workspace_prueba()
+
+        self.problema_a = crear_problema_prueba(
+            self.workspace, nombre="Escenario A"
         )
 
-        self.problema_b = Problema.objects.create(
-            nombre="Escenario B"
+        self.problema_b = crear_problema_prueba(
+            self.workspace, nombre="Escenario B"
         )
 
         self.producto = Producto.objects.create(

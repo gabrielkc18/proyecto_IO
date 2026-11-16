@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 
 from apps.problemas.models import Problema
 from apps.recursos.models import Recurso
+from apps.workspaces.test_utils import crear_workspace_prueba, crear_problema_prueba
 
 
 class RecursoAPITests(APITestCase):
@@ -16,12 +17,17 @@ class RecursoAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
-        self.problema = Problema.objects.create(
-            nombre="Producción industrial"
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
         )
 
-        self.otro_problema = Problema.objects.create(
-            nombre="Producción secundaria"
+        self.problema = crear_problema_prueba(
+            self.workspace, nombre="Producción industrial"
+        )
+
+        self.otro_problema = crear_problema_prueba(
+            self.workspace, nombre="Producción secundaria"
         )
 
         self.recurso = Recurso.objects.create(
@@ -151,3 +157,56 @@ class RecursoAPITests(APITestCase):
                 pk=self.recurso.pk
             ).exists()
         )
+
+
+    def test_rechazar_peticion_sin_workspace(self):
+        self.client.credentials()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_permitir_workspace_de_otro_usuario(self):
+        otro_usuario, otro_workspace = crear_workspace_prueba()
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(otro_workspace.pk)
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_no_permitir_consultar_recurso_de_otro_workspace(self):
+        otro_usuario, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace, nombre="Problema externo"
+        )
+        recurso_externo = Recurso.objects.create(
+            problema=problema_externo,
+            nombre="Recurso externo",
+            unidad_medida="kg",
+            disponibilidad=100,
+        )
+
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
+        url = reverse(
+            "recurso-detail",
+            kwargs={"pk": recurso_externo.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_no_permitir_asignar_problema_de_otro_workspace(self):
+        otro_usuario, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace, nombre="Problema externo"
+        )
+        response = self.client.post(
+            self.url,
+            {
+                "problema": problema_externo.pk,
+                "nombre": "Recurso no autorizado",
+                "unidad_medida": "kg",
+                "disponibilidad": "100",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
