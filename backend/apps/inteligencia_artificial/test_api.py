@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 
 from django.urls import reverse
 
@@ -12,6 +13,11 @@ from apps.inteligencia_artificial.models import AnalisisIA
 class AnalisisIAAPITests(APITestCase):
 
     def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="usuario_prueba",
+            password="PruebaSegura123!"
+        )
+        self.client.force_authenticate(user=self.user)
         self.problema = Problema.objects.create(
             nombre="Producción industrial"
         )
