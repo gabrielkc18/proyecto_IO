@@ -36,14 +36,15 @@ class ResultadoProducto(models.Model):
         return f"{self.nombre_producto}: {self.cantidad} unidades"
 
     class Meta:
-        verbose_name = "Resultado de producto"
-        verbose_name_plural = "Resultados de productos"
-
         constraints = [
             models.UniqueConstraint(
                 fields=["ejecucion", "producto"],
                 name="unique_resultado_producto_por_ejecucion"
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(utilidad_aportada__gte=0),
+                name="resultado_utilidad_aportada_no_negativa"
+            ),
         ]
 
 
@@ -97,9 +98,6 @@ class ResultadoRecurso(models.Model):
         return f"{self.nombre_recurso}: {self.estado_uso}"
 
     class Meta:
-        verbose_name = "Resultado de recurso"
-        verbose_name_plural = "Resultados de recursos"
-
         constraints = [
             models.UniqueConstraint(
                 fields=["ejecucion", "recurso"],
@@ -108,5 +106,5 @@ class ResultadoRecurso(models.Model):
             models.CheckConstraint(
                 condition=models.Q(holgura__gte=0),
                 name="resultado_recurso_holgura_no_negativa"
-            )
-        ]
+            ),
+        ]                                                                       
