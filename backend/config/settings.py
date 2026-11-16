@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     
     #Apps del proyecto
+    'apps.workspaces.apps.WorkspacesConfig',
     'apps.problemas.apps.ProblemasConfig',
     'apps.productos.apps.ProductosConfig',
     'apps.recursos.apps.RecursosConfig',
