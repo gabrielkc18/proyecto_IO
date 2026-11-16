@@ -1,0 +1,141 @@
+
+from django.urls import reverse
+
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from apps.problemas.models import Problema
+from apps.optimizacion.models import Ejecucion
+from apps.inteligencia_artificial.models import AnalisisIA
+
+
+class AnalisisIAAPITests(APITestCase):
+
+    def setUp(self):
+        self.problema = Problema.objects.create(
+            nombre="Producción industrial"
+        )
+
+        self.otro_problema = Problema.objects.create(
+            nombre="Producción secundaria"
+        )
+
+        self.ejecucion = Ejecucion.objects.create(
+            problema=self.problema
+        )
+
+        self.otra_ejecucion = Ejecucion.objects.create(
+            problema=self.otro_problema
+        )
+
+        self.analisis = AnalisisIA.objects.create(
+            ejecucion=self.ejecucion,
+            tipo_analisis="GENERAL",
+            pregunta="¿Qué indican los resultados?",
+            contenido="La producción presenta una utilidad favorable.",
+            modelo_ia="modelo-prueba",
+            contexto_enviado={
+                "utilidad_total": 15000
+            }
+        )
+
+        self.url = reverse("analisis-ia-list")
+
+    def test_listar_analisis(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+        self.assertEqual(len(response.data), 1)
+
+    def test_filtrar_analisis_por_ejecucion(self):
+        response = self.client.get(
+            self.url,
+            {"ejecucion": self.ejecucion.id}
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+        self.assertEqual(len(response.data), 1)
+
+    def test_filtrar_analisis_por_problema(self):
+        response = self.client.get(
+            self.url,
+            {"problema": self.problema.id}
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+        self.assertEqual(len(response.data), 1)
+
+    def test_consultar_analisis(self):
+        url = reverse(
+            "analisis-ia-detail",
+            kwargs={"pk": self.analisis.pk}
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["contenido"],
+            "La producción presenta una utilidad favorable."
+        )
+
+    def test_no_permitir_crear_analisis(self):
+        response = self.client.post(
+            self.url,
+            {},
+            format="json"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def test_no_permitir_modificar_analisis(self):
+        url = reverse(
+            "analisis-ia-detail",
+            kwargs={"pk": self.analisis.pk}
+        )
+
+        response = self.client.patch(
+            url,
+            {"contenido": "Contenido modificado"},
+            format="json"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def test_no_permitir_eliminar_analisis(self):
+        url = reverse(
+            "analisis-ia-detail",
+            kwargs={"pk": self.analisis.pk}
+        )
+
+        response = self.client.delete(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+        self.assertTrue(
+            AnalisisIA.objects.filter(
+                pk=self.analisis.pk
+            ).exists()
+        )
