@@ -17,3 +17,12 @@ class AnalisisIASerializer(serializers.ModelSerializer):
             "contexto_enviado",
         ]
         read_only_fields = fields
+
+
+class GenerarAnalisisSerializer(serializers.Serializer):
+
+    pregunta = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=5000,
+    )

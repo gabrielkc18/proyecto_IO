@@ -3,14 +3,11 @@ from decouple import config
 from groq import Groq
 
 
-def generar_respuesta(
-    mensajes,
-    max_completion_tokens=1500,
-):
-    """
-    Envía una conversación a Groq y devuelve
-    el contenido generado y el modelo utilizado.
-    """
+class ErrorProveedorIA(Exception):
+    """Error controlado durante la comunicación con el proveedor."""
+
+
+def generar_respuesta(mensajes, max_completion_tokens=1500):
 
     api_key = config("GROQ_API_KEY", default="")
     modelo = config(
@@ -19,8 +16,8 @@ def generar_respuesta(
     )
 
     if not api_key:
-        raise ValueError(
-            "La variable GROQ_API_KEY no está configurada."
+        raise ErrorProveedorIA(
+            "La API Key de Groq no está configurada."
         )
 
     if not isinstance(mensajes, list) or not mensajes:
@@ -28,22 +25,31 @@ def generar_respuesta(
             "Debe proporcionarse una lista de mensajes."
         )
 
-    cliente = Groq(api_key=api_key)
+    try:
+        cliente = Groq(api_key=api_key)
 
-    respuesta = cliente.chat.completions.create(
-        model=modelo,
-        messages=mensajes,
-        max_completion_tokens=max_completion_tokens,
-    )
-
-    contenido = respuesta.choices[0].message.content
-
-    if not contenido:
-        raise RuntimeError(
-            "El proveedor de IA no devolvió contenido."
+        respuesta = cliente.chat.completions.create(
+            model=modelo,
+            messages=mensajes,
+            max_completion_tokens=max_completion_tokens,
         )
 
-    return {
-        "contenido": contenido,
-        "modelo": respuesta.model,
-    }
+        contenido = respuesta.choices[0].message.content
+
+        if not contenido:
+            raise ErrorProveedorIA(
+                "El proveedor no devolvió contenido."
+            )
+
+        return {
+            "contenido": contenido,
+            "modelo": respuesta.model,
+        }
+
+    except ErrorProveedorIA:
+        raise
+
+    except Exception as error:
+        raise ErrorProveedorIA(
+            "No fue posible comunicarse con el proveedor de IA."
+        ) from error

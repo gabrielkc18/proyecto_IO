@@ -1,7 +1,11 @@
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import AnalisisIAViewSet
+from .views import (
+    AnalisisIAViewSet,
+    GenerarAnalisisAPIView,
+)
 
 
 router = DefaultRouter()
@@ -12,4 +16,10 @@ router.register(
     basename="analisis-ia"
 )
 
-urlpatterns = router.urls
+urlpatterns = [
+    path(
+        "analisis-ia/ejecuciones/<int:ejecucion_id>/generar/",
+        GenerarAnalisisAPIView.as_view(),
+        name="generar-analisis-ia",
+    ),
+] + router.urls
