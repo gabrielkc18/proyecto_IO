@@ -43,5 +43,9 @@ class Producto(models.Model):
             models.UniqueConstraint(
                 fields=["problema", "codigo"],
                 name="unique_producto_por_problema"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(utilidad_unitaria__gte=0),
+                name="producto_utilidad_no_negativa"
             )
         ]
