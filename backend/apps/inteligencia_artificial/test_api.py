@@ -8,6 +8,8 @@ from rest_framework.test import APITestCase
 from apps.problemas.models import Problema
 from apps.optimizacion.models import Ejecucion
 from apps.inteligencia_artificial.models import AnalisisIA
+from apps.workspaces.test_utils import crear_workspace_prueba
+from apps.workspaces.test_utils import crear_problema_prueba
 
 
 class AnalisisIAAPITests(APITestCase):
@@ -18,11 +20,17 @@ class AnalisisIAAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción industrial"
         )
 
         self.otro_problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción secundaria"
         )
 
@@ -144,4 +152,58 @@ class AnalisisIAAPITests(APITestCase):
             AnalisisIA.objects.filter(
                 pk=self.analisis.pk
             ).exists()
+        )
+
+    def test_no_listar_analisis_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        analisis_externo = AnalisisIA.objects.create(
+            ejecucion=ejecucion_externa,
+            tipo_analisis="GENERAL",
+            pregunta="Pregunta externa",
+            contenido="Análisis externo",
+            modelo_ia="modelo-prueba",
+            contexto_enviado={},
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(analisis_externo.pk, ids)
+        self.assertEqual(len(response.data), 1)
+
+    def test_no_consultar_analisis_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        analisis_externo = AnalisisIA.objects.create(
+            ejecucion=ejecucion_externa,
+            tipo_analisis="GENERAL",
+            pregunta="Pregunta externa",
+            contenido="Análisis externo",
+            modelo_ia="modelo-prueba",
+            contexto_enviado={},
+        )
+
+        url = reverse(
+            "analisis-ia-detail",
+            kwargs={"pk": analisis_externo.pk},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
         )

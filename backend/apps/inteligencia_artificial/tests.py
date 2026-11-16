@@ -6,12 +6,15 @@ from django.db.models.deletion import ProtectedError
 from apps.problemas.models import Problema
 from apps.optimizacion.models import Ejecucion
 from .models import AnalisisIA
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class AnalisisIATests(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema de prueba"
         )
 

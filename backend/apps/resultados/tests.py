@@ -6,12 +6,15 @@ from apps.productos.models import Producto
 from apps.recursos.models import Recurso
 from apps.optimizacion.models import Ejecucion
 from .models import ResultadoProducto, ResultadoRecurso
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class ResultadoProductoModelTest(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción noviembre"
         )
 
@@ -91,7 +94,9 @@ class ResultadoProductoModelTest(TestCase):
 class ResultadoRecursoTests(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema de prueba"
         )
 

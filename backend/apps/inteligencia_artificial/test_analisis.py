@@ -12,12 +12,15 @@ from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
 
 from apps.inteligencia_artificial.models import AnalisisIA
 from apps.inteligencia_artificial.services.analisis import generar_analisis
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class GenerarAnalisisTests(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema análisis IA",
             sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
             estado=Problema.Estado.LISTO,

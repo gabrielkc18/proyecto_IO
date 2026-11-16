@@ -9,6 +9,7 @@ from apps.workspaces.test_utils import (
     crear_workspace_prueba,
     crear_problema_prueba,
 )
+from apps.workspaces.models import WorkspaceMembership
 
 
 class ProblemaAPITests(APITestCase):
@@ -204,4 +205,25 @@ class ProblemaAPITests(APITestCase):
         self.assertNotEqual(
             problema.workspace_id,
             otro_workspace.pk,
+        )
+
+
+    def test_viewer_no_puede_crear_problemas(self):
+        WorkspaceMembership.objects.filter(
+            workspace=self.workspace,
+            usuario=self.user,
+        ).update(rol=WorkspaceMembership.Rol.VIEWER)
+
+        response = self.client.post(
+            self.url,
+            {"nombre": "Problema no autorizado"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Problema.objects.filter(
+                workspace=self.workspace,
+                nombre="Problema no autorizado",
+            ).exists()
         )

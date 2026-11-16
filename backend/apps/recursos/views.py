@@ -1,62 +1,20 @@
 from rest_framework import viewsets
-from rest_framework.exceptions import ValidationError, NotFound
 
-from apps.workspaces.models import Workspace
+from apps.workspaces.mixins import WorkspaceContextMixin
 
 from .models import Recurso, ConsumoRecurso
-from .serializers import (
-    RecursoSerializer,
-    ConsumoRecursoSerializer,
-)
-
-
-class WorkspaceContextMixin:
-
-    def get_workspace(self):
-        workspace_id = self.request.headers.get("X-Workspace-ID")
-
-        if not workspace_id:
-            raise ValidationError({
-                "workspace": "Debes enviar el encabezado X-Workspace-ID."
-            })
-
-        try:
-            workspace_id = int(workspace_id)
-        except (TypeError, ValueError):
-            raise ValidationError({
-                "workspace": "El identificador del Workspace no es válido."
-            })
-
-        workspace = Workspace.objects.filter(
-            pk=workspace_id,
-            membresias__usuario=self.request.user,
-        ).first()
-
-        if workspace is None:
-            raise NotFound(
-                "El Workspace no existe o no tienes acceso a él."
-            )
-
-        return workspace
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["workspace"] = self.get_workspace()
-        return context
+from .serializers import RecursoSerializer, ConsumoRecursoSerializer
 
 
 class RecursoViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
-
     serializer_class = RecursoSerializer
 
     def get_queryset(self):
-        workspace = self.get_workspace()
-
         queryset = Recurso.objects.select_related(
             "problema",
             "problema__workspace",
         ).filter(
-            problema__workspace=workspace,
+            problema__workspace=self.get_workspace()
         )
 
         problema_id = self.request.query_params.get("problema")
@@ -71,7 +29,6 @@ class ConsumoRecursoViewSet(
     WorkspaceContextMixin,
     viewsets.ModelViewSet,
 ):
-
     serializer_class = ConsumoRecursoSerializer
 
     def get_queryset(self):

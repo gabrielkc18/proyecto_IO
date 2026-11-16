@@ -9,12 +9,15 @@ from apps.recursos.models import Recurso, ConsumoRecurso
 from apps.optimizacion.models import Ejecucion
 from apps.resultados.models import ResultadoProducto, ResultadoRecurso
 from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class EjecucionServiceTests(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema de prueba",
             sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
             estado=Problema.Estado.LISTO,

@@ -1,33 +1,35 @@
-
 from rest_framework import viewsets
+
+from apps.workspaces.mixins import WorkspaceContextMixin
 
 from .models import ResultadoProducto, ResultadoRecurso
 from .serializers import (
     ResultadoProductoSerializer,
-    ResultadoRecursoSerializer
+    ResultadoRecursoSerializer,
 )
 
 
-class ResultadoProductoViewSet(viewsets.ReadOnlyModelViewSet):
-
+class ResultadoProductoViewSet(
+    WorkspaceContextMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = ResultadoProductoSerializer
 
-    queryset = ResultadoProducto.objects.select_related(
-        "ejecucion",
-        "ejecucion__problema",
-        "producto"
-    ).all()
-
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = ResultadoProducto.objects.select_related(
+            "ejecucion",
+            "ejecucion__problema",
+            "ejecucion__problema__workspace",
+            "producto",
+        ).filter(
+            ejecucion__problema__workspace=self.get_workspace()
+        )
 
         ejecucion_id = self.request.query_params.get("ejecucion")
         problema_id = self.request.query_params.get("problema")
 
         if ejecucion_id:
-            queryset = queryset.filter(
-                ejecucion_id=ejecucion_id
-            )
+            queryset = queryset.filter(ejecucion_id=ejecucion_id)
 
         if problema_id:
             queryset = queryset.filter(
@@ -37,26 +39,27 @@ class ResultadoProductoViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
-class ResultadoRecursoViewSet(viewsets.ReadOnlyModelViewSet):
-
+class ResultadoRecursoViewSet(
+    WorkspaceContextMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = ResultadoRecursoSerializer
 
-    queryset = ResultadoRecurso.objects.select_related(
-        "ejecucion",
-        "ejecucion__problema",
-        "recurso"
-    ).all()
-
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = ResultadoRecurso.objects.select_related(
+            "ejecucion",
+            "ejecucion__problema",
+            "ejecucion__problema__workspace",
+            "recurso",
+        ).filter(
+            ejecucion__problema__workspace=self.get_workspace()
+        )
 
         ejecucion_id = self.request.query_params.get("ejecucion")
         problema_id = self.request.query_params.get("problema")
 
         if ejecucion_id:
-            queryset = queryset.filter(
-                ejecucion_id=ejecucion_id
-            )
+            queryset = queryset.filter(ejecucion_id=ejecucion_id)
 
         if problema_id:
             queryset = queryset.filter(
@@ -64,4 +67,3 @@ class ResultadoRecursoViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         return queryset
-

@@ -7,6 +7,8 @@ from rest_framework.test import APITestCase
 
 from apps.problemas.models import Problema
 from apps.optimizacion.models import Ejecucion
+from apps.workspaces.test_utils import crear_workspace_prueba
+from apps.workspaces.test_utils import crear_problema_prueba
 
 
 class EjecucionAPITests(APITestCase):
@@ -17,11 +19,17 @@ class EjecucionAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción industrial"
         )
 
         self.otro_problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción secundaria"
         )
 
@@ -121,4 +129,43 @@ class EjecucionAPITests(APITestCase):
             Ejecucion.objects.filter(
                 pk=self.ejecucion.pk
             ).exists()
+        )
+
+    def test_no_listar_ejecuciones_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(ejecucion_externa.pk, ids)
+        self.assertEqual(len(response.data), 2)
+
+    def test_no_consultar_ejecucion_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+
+        url = reverse(
+            "ejecucion-detail",
+            kwargs={"pk": ejecucion_externa.pk},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
         )

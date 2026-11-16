@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from rest_framework import status
 from rest_framework.test import APITestCase
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class JWTAuthenticationAPITests(APITestCase):
@@ -15,6 +16,7 @@ class JWTAuthenticationAPITests(APITestCase):
             password=self.password
         )
 
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
         self.token_url = reverse("token_obtain_pair")
         self.refresh_url = reverse("token_refresh")
         self.problemas_url = reverse("problema-list")
@@ -87,7 +89,8 @@ class JWTAuthenticationAPITests(APITestCase):
         access = tokens.data["access"]
 
         self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {access}"
+            HTTP_AUTHORIZATION=f"Bearer {access}",
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk),
         )
 
         response = self.client.get(self.problemas_url)

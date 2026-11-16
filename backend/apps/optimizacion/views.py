@@ -1,36 +1,43 @@
-
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
+
+from apps.workspaces.mixins import WorkspaceContextMixin
+from apps.problemas.models import Problema
 
 from .models import Ejecucion
 from .serializers import EjecucionSerializer
-from apps.problemas.models import Problema
-from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
+from .services.ejecucion import ejecutar_optimizacion
 
 
-class EjecucionViewSet(viewsets.ReadOnlyModelViewSet):
-
+class EjecucionViewSet(
+    WorkspaceContextMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = EjecucionSerializer
 
-    queryset = Ejecucion.objects.select_related(
-        "problema"
-    ).all()
-
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = Ejecucion.objects.select_related(
+            "problema",
+            "problema__workspace",
+        ).filter(
+            problema__workspace=self.get_workspace()
+        )
 
         problema_id = self.request.query_params.get("problema")
 
         if problema_id:
-            queryset = queryset.filter(
-                problema_id=problema_id
-            )
+            queryset = queryset.filter(problema_id=problema_id)
 
         return queryset
 
 
-class ProblemaOptimizacionViewSet(viewsets.ViewSet):
+class ProblemaOptimizacionViewSet(
+    WorkspaceContextMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = Problema.objects.all()
 
     @action(
         detail=True,
@@ -38,13 +45,14 @@ class ProblemaOptimizacionViewSet(viewsets.ViewSet):
         url_path="ejecutar",
     )
     def ejecutar(self, request, pk=None):
+        problema = Problema.objects.filter(
+            pk=pk,
+            workspace=self.get_workspace(),
+        ).first()
 
-        try:
-            problema = Problema.objects.get(pk=pk)
-        except Problema.DoesNotExist:
-            return Response(
-                {"error": "El problema solicitado no existe."},
-                status=status.HTTP_404_NOT_FOUND,
+        if problema is None:
+            raise NotFound(
+                "El problema no existe o no pertenece al Workspace activo."
             )
 
         try:

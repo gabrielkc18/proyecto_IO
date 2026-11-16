@@ -9,12 +9,15 @@ from apps.optimizacion.models import Ejecucion
 
 from django.test import SimpleTestCase
 from apps.optimizacion.services.solver import resolver_problema
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class EjecucionModelTest(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción noviembre"
         )
 

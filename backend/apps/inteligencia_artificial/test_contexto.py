@@ -10,12 +10,15 @@ from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
 from apps.inteligencia_artificial.services.contexto import (
     construir_contexto,
 )
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class ContextoIATests(TestCase):
 
     def setUp(self):
+        self.usuario, self.workspace = crear_workspace_prueba()
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema contexto IA",
             sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
             estado=Problema.Estado.LISTO,

@@ -13,6 +13,8 @@ from apps.resultados.models import (
     ResultadoProducto,
     ResultadoRecurso
 )
+from apps.workspaces.test_utils import crear_workspace_prueba
+from apps.workspaces.test_utils import crear_problema_prueba
 
 
 class ResultadosAPITests(APITestCase):
@@ -23,11 +25,17 @@ class ResultadosAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción industrial"
         )
 
         self.otro_problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Producción secundaria"
         )
 
@@ -194,4 +202,140 @@ class ResultadosAPITests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def test_no_listar_resultados_producto_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        producto_externo = Producto.objects.create(
+            problema=problema_externo,
+            codigo="EXT-P1",
+            nombre="Producto externo",
+            utilidad_unitaria=80,
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        resultado_externo = ResultadoProducto.objects.create(
+            ejecucion=ejecucion_externa,
+            producto=producto_externo,
+            nombre_producto="Producto externo",
+            utilidad_unitaria=80,
+            cantidad=10,
+            utilidad_aportada=800,
+        )
+
+        response = self.client.get(self.productos_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(resultado_externo.pk, ids)
+        self.assertEqual(len(response.data), 1)
+
+    def test_no_consultar_resultado_producto_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        producto_externo = Producto.objects.create(
+            problema=problema_externo,
+            codigo="EXT-P2",
+            nombre="Producto externo",
+            utilidad_unitaria=80,
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        resultado_externo = ResultadoProducto.objects.create(
+            ejecucion=ejecucion_externa,
+            producto=producto_externo,
+            nombre_producto="Producto externo",
+            utilidad_unitaria=80,
+            cantidad=10,
+            utilidad_aportada=800,
+        )
+
+        url = reverse(
+            "resultado-producto-detail",
+            kwargs={"pk": resultado_externo.pk},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_no_listar_resultados_recurso_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        recurso_externo = Recurso.objects.create(
+            problema=problema_externo,
+            nombre="Recurso externo",
+            unidad_medida="kg",
+            disponibilidad=3000,
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        resultado_externo = ResultadoRecurso.objects.create(
+            ejecucion=ejecucion_externa,
+            recurso=recurso_externo,
+            nombre_recurso="Recurso externo",
+            unidad_medida="kg",
+            disponibilidad=3000,
+            consumo_total=2500,
+            holgura=500,
+            estado_uso="CON_HOLGURA",
+        )
+
+        response = self.client.get(self.recursos_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(resultado_externo.pk, ids)
+        self.assertEqual(len(response.data), 1)
+
+    def test_no_consultar_resultado_recurso_de_otro_workspace(self):
+        _, otro_workspace = crear_workspace_prueba()
+        problema_externo = crear_problema_prueba(
+            otro_workspace,
+            nombre="Problema externo",
+        )
+        recurso_externo = Recurso.objects.create(
+            problema=problema_externo,
+            nombre="Recurso externo",
+            unidad_medida="kg",
+            disponibilidad=3000,
+        )
+        ejecucion_externa = Ejecucion.objects.create(
+            problema=problema_externo,
+        )
+        resultado_externo = ResultadoRecurso.objects.create(
+            ejecucion=ejecucion_externa,
+            recurso=recurso_externo,
+            nombre_recurso="Recurso externo",
+            unidad_medida="kg",
+            disponibilidad=3000,
+            consumo_total=2500,
+            holgura=500,
+            estado_uso="CON_HOLGURA",
+        )
+
+        url = reverse(
+            "resultado-recurso-detail",
+            kwargs={"pk": resultado_externo.pk},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
         )

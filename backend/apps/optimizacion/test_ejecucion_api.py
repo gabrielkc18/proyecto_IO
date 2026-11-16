@@ -9,6 +9,7 @@ from apps.problemas.models import Problema
 from apps.productos.models import Producto
 from apps.recursos.models import Recurso, ConsumoRecurso
 from apps.optimizacion.models import Ejecucion
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class EjecutarOptimizacionAPITests(APITestCase):
@@ -19,7 +20,12 @@ class EjecutarOptimizacionAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema API",
             sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
             estado=Problema.Estado.LISTO,

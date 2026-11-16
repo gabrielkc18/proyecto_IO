@@ -11,6 +11,7 @@ from apps.productos.models import Producto
 from apps.recursos.models import Recurso, ConsumoRecurso
 from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
 from apps.inteligencia_artificial.models import AnalisisIA
+from apps.workspaces.test_utils import crear_workspace_prueba
 
 
 class GenerarAnalisisAPITests(APITestCase):
@@ -21,7 +22,12 @@ class GenerarAnalisisAPITests(APITestCase):
             password="PruebaSegura123!"
         )
         self.client.force_authenticate(user=self.user)
+        _, self.workspace = crear_workspace_prueba(usuario=self.user)
+        self.client.credentials(
+            HTTP_X_WORKSPACE_ID=str(self.workspace.pk)
+        )
         self.problema = Problema.objects.create(
+            workspace=self.workspace,
             nombre="Problema API IA",
             sentido_objetivo=Problema.SentidoObjetivo.MAXIMIZAR,
             estado=Problema.Estado.LISTO,
@@ -91,7 +97,7 @@ class GenerarAnalisisAPITests(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_404_NOT_FOUND,
         )
 
         self.assertEqual(AnalisisIA.objects.count(), 0)
