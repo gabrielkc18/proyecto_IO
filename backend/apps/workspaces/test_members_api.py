@@ -686,6 +686,33 @@ class WorkspaceAdminInvariantTests(APITestCase):
             {"workspace", "usuario", "rol", "fecha_creacion"},
         )
 
+    def test_workspace_admin_access_is_limited_to_active_superusers(self):
+        self.request.user = self.owner
+        self.assertFalse(
+            self.workspace_admin.has_module_permission(self.request)
+        )
+        self.assertFalse(
+            self.workspace_admin.has_view_permission(self.request)
+        )
+
+        platform_operator = User.objects.create_superuser(
+            username="platform_operator",
+            password="PruebaSegura123!",
+        )
+        self.request.user = platform_operator
+        self.assertTrue(
+            self.workspace_admin.has_module_permission(self.request)
+        )
+        self.assertTrue(
+            self.workspace_admin.has_view_permission(self.request)
+        )
+
+        platform_operator.is_active = False
+        platform_operator.save(update_fields=["is_active"])
+        self.assertFalse(
+            self.workspace_admin.has_view_permission(self.request)
+        )
+
     def test_admin_workspace_owner_field_only_lists_active_users(self):
         inactive_user = User.objects.create_user(
             username="inactive_admin_owner",

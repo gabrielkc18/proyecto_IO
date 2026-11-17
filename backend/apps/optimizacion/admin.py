@@ -1,9 +1,11 @@
 from django.contrib import admin
+
+from config.admin import ReadOnlyRecordsAdminMixin
 from .models import Ejecucion
 
 
 @admin.register(Ejecucion)
-class EjecucionAdmin(admin.ModelAdmin):
+class EjecucionAdmin(ReadOnlyRecordsAdminMixin, admin.ModelAdmin):
     list_display = (
         "id",
         "problema",
@@ -16,4 +18,3 @@ class EjecucionAdmin(admin.ModelAdmin):
     list_filter = ("estado_proceso", "estado_solver")
     search_fields = ("problema__nombre", "solver_nombre")
     list_select_related = ("problema",)
-    readonly_fields = ("fecha_inicio",)

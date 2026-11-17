@@ -1,9 +1,11 @@
 from django.contrib import admin
+
+from config.admin import ReadOnlyRecordsAdminMixin
 from .models import ResultadoProducto, ResultadoRecurso
 
 
 @admin.register(ResultadoProducto)
-class ResultadoProductoAdmin(admin.ModelAdmin):
+class ResultadoProductoAdmin(ReadOnlyRecordsAdminMixin, admin.ModelAdmin):
     list_display = (
         "ejecucion",
         "producto",
@@ -17,7 +19,7 @@ class ResultadoProductoAdmin(admin.ModelAdmin):
 
 
 @admin.register(ResultadoRecurso)
-class ResultadoRecursoAdmin(admin.ModelAdmin):
+class ResultadoRecursoAdmin(ReadOnlyRecordsAdminMixin, admin.ModelAdmin):
     list_display = (
         "ejecucion",
         "recurso",

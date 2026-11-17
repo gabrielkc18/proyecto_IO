@@ -2,11 +2,13 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
+from config.admin import SuperuserOnlyAdminMixin
+
 from .models import Workspace, WorkspaceMembership
 
 
 @admin.register(Workspace)
-class WorkspaceAdmin(admin.ModelAdmin):
+class WorkspaceAdmin(SuperuserOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "nombre", "propietario", "fecha_creacion")
     search_fields = ("nombre", "propietario__username")
     list_filter = ("fecha_creacion",)
@@ -39,7 +41,7 @@ class WorkspaceAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkspaceMembership)
-class WorkspaceMembershipAdmin(admin.ModelAdmin):
+class WorkspaceMembershipAdmin(SuperuserOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("workspace", "usuario", "rol", "fecha_creacion")
     list_filter = ("rol",)
     search_fields = ("workspace__nombre", "usuario__username")

@@ -49,6 +49,8 @@ class WorkspaceContextMixin:
         return membership
 
     def get_workspace(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Workspace(pk=0)
         return self.get_membership().workspace
 
     def get_workspace_role(self):

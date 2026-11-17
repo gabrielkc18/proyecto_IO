@@ -1,9 +1,11 @@
 from django.contrib import admin
+
+from config.admin import ReadOnlyRecordsAdminMixin
 from .models import AnalisisIA
 
 
 @admin.register(AnalisisIA)
-class AnalisisIAAdmin(admin.ModelAdmin):
+class AnalisisIAAdmin(ReadOnlyRecordsAdminMixin, admin.ModelAdmin):
     list_display = (
         "id",
         "ejecucion",

@@ -1,12 +1,13 @@
 from django.db import IntegrityError, OperationalError, connection, transaction
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import WorkspaceMembership
+from .models import Workspace, WorkspaceMembership
 from .serializers import (
     WorkspaceMemberCreateSerializer,
     WorkspaceMemberRoleSerializer,
@@ -41,6 +42,27 @@ class WorkspaceMemberAPIView(APIView):
 
         return membership
 
+    def get_locked_actor_membership(self, request, workspace_id):
+        workspace = Workspace.objects.select_for_update().filter(
+            pk=workspace_id,
+        ).first()
+        if workspace is None:
+            raise NotFound(
+                "Workspace inexistente o sin acceso para este usuario."
+            )
+
+        membership = WorkspaceMembership.objects.select_related(
+            "workspace"
+        ).filter(
+            workspace=workspace,
+            usuario=request.user,
+        ).first()
+        if membership is None:
+            raise NotFound(
+                "Workspace inexistente o sin acceso para este usuario."
+            )
+        return membership
+
     def get_target_membership(self, workspace_id, membership_id):
         membership = WorkspaceMembership.objects.select_related(
             "workspace",
@@ -64,6 +86,10 @@ class WorkspaceMemberAPIView(APIView):
 
 class WorkspaceMemberListCreateAPIView(WorkspaceMemberAPIView):
 
+    @extend_schema(
+        tags=["Miembros"],
+        responses={200: WorkspaceMemberSerializer(many=True)},
+    )
     def get(self, request, workspace_id):
         actor_membership = self.get_actor_membership(
             request,
@@ -81,10 +107,20 @@ class WorkspaceMemberListCreateAPIView(WorkspaceMemberAPIView):
             WorkspaceMemberSerializer(memberships, many=True).data,
         )
 
+    @extend_schema(
+        tags=["Miembros"],
+        request=WorkspaceMemberCreateSerializer,
+        responses={
+            201: WorkspaceMemberSerializer,
+            400: OpenApiResponse(description="Usuario o rol inválido."),
+            403: OpenApiResponse(description="Rol insuficiente."),
+            409: OpenApiResponse(description="La membresía ya existe."),
+        },
+    )
     def post(self, request, workspace_id):
         try:
             with transaction.atomic():
-                actor_membership = self.get_actor_membership(
+                actor_membership = self.get_locked_actor_membership(
                     request,
                     workspace_id,
                 )
@@ -152,10 +188,20 @@ class WorkspaceMemberListCreateAPIView(WorkspaceMemberAPIView):
 
 class WorkspaceMemberDetailAPIView(WorkspaceMemberAPIView):
 
+    @extend_schema(
+        tags=["Miembros"],
+        request=WorkspaceMemberRoleSerializer,
+        responses={
+            200: WorkspaceMemberSerializer,
+            403: OpenApiResponse(description="Rol insuficiente."),
+            404: OpenApiResponse(description="Membresía no encontrada."),
+            409: OpenApiResponse(description="Conflicto de integridad."),
+        },
+    )
     def patch(self, request, workspace_id, membership_id):
         try:
             with transaction.atomic():
-                actor_membership = self.get_actor_membership(
+                actor_membership = self.get_locked_actor_membership(
                     request,
                     workspace_id,
                 )
@@ -224,10 +270,19 @@ class WorkspaceMemberDetailAPIView(WorkspaceMemberAPIView):
 
         return Response(WorkspaceMemberSerializer(target_membership).data)
 
+    @extend_schema(
+        tags=["Miembros"],
+        responses={
+            204: OpenApiResponse(description="Membresía eliminada."),
+            403: OpenApiResponse(description="Rol insuficiente."),
+            404: OpenApiResponse(description="Membresía no encontrada."),
+            409: OpenApiResponse(description="Conflicto de integridad."),
+        },
+    )
     def delete(self, request, workspace_id, membership_id):
         try:
             with transaction.atomic():
-                actor_membership = self.get_actor_membership(
+                actor_membership = self.get_locked_actor_membership(
                     request,
                     workspace_id,
                 )
@@ -287,32 +342,35 @@ class WorkspaceMemberDetailAPIView(WorkspaceMemberAPIView):
 
 class WorkspaceOwnershipTransferAPIView(WorkspaceMemberAPIView):
 
+    @extend_schema(
+        tags=["Miembros"],
+        request=WorkspaceOwnershipTransferSerializer,
+        responses={
+            200: WorkspaceMemberSerializer,
+            400: OpenApiResponse(description="Destinatario inválido."),
+            403: OpenApiResponse(description="Solo OWNER puede transferir."),
+            409: OpenApiResponse(description="Conflicto de integridad."),
+        },
+    )
     def post(self, request, workspace_id):
-        actor_membership = self.get_actor_membership(
-            request,
-            workspace_id,
-        )
-        self.require_role(
-            actor_membership,
-            {WorkspaceMembership.Rol.OWNER},
-        )
-
-        serializer = WorkspaceOwnershipTransferSerializer(
-            data=request.data,
-            context={"workspace": actor_membership.workspace},
-        )
-        serializer.is_valid(raise_exception=True)
-        requested_membership = serializer.validated_data["membresia"]
-
         try:
             with transaction.atomic():
-                actor_membership = WorkspaceMembership.objects.select_related(
-                    "workspace"
-                ).get(
-                    pk=actor_membership.pk,
-                    workspace_id=workspace_id,
-                    usuario=request.user,
+                actor_membership = self.get_locked_actor_membership(
+                    request,
+                    workspace_id,
                 )
+                self.require_role(
+                    actor_membership,
+                    {WorkspaceMembership.Rol.OWNER},
+                )
+
+                serializer = WorkspaceOwnershipTransferSerializer(
+                    data=request.data,
+                    context={"workspace": actor_membership.workspace},
+                )
+                serializer.is_valid(raise_exception=True)
+                requested_membership = serializer.validated_data["membresia"]
+
                 if actor_membership.rol != WorkspaceMembership.Rol.OWNER:
                     raise PermissionDenied(
                         "Solo un OWNER puede transferir la propiedad."
@@ -393,6 +451,7 @@ class WorkspaceViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = WorkspaceMembershipSerializer
+    queryset = WorkspaceMembership.objects.none()
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
