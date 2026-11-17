@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 from decouple import config, Csv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,17 +21,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config("SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=False, cast=bool)
+ENVIRONMENT = config("DJANGO_ENV", default="development").lower()
+IS_PRODUCTION = ENVIRONMENT == "production"
+DEBUG = config("DEBUG", default=not IS_PRODUCTION, cast=bool)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
-    default="localhost,127.0.0.1",
+    default="" if IS_PRODUCTION else "localhost,127.0.0.1",
     cast=Csv()
 )
+
+if IS_PRODUCTION and (DEBUG or not ALLOWED_HOSTS):
+    raise ImproperlyConfigured(
+        "Production requires DEBUG=False and explicit ALLOWED_HOSTS."
+    )
 
 
 # Application definition
@@ -46,8 +52,10 @@ INSTALLED_APPS = [
     
     # Apps de terceros
     'rest_framework',
+    'drf_spectacular',
     
     #Apps del proyecto
+    'apps.cuentas.apps.CuentasConfig',
     'apps.workspaces.apps.WorkspacesConfig',
     'apps.problemas.apps.ProblemasConfig',
     'apps.productos.apps.ProductosConfig',
@@ -88,12 +96,61 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+DATABASE_ENGINE = config(
+    "DATABASE_ENGINE",
+    default="postgresql" if IS_PRODUCTION else "sqlite",
+).lower()
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if DATABASE_ENGINE == "postgresql":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("POSTGRES_DB"),
+            "USER": config("POSTGRES_USER"),
+            "PASSWORD": config("POSTGRES_PASSWORD"),
+            "HOST": config("POSTGRES_HOST", default="localhost"),
+            "PORT": config("POSTGRES_PORT", default="5432"),
+            "CONN_MAX_AGE": config(
+                "POSTGRES_CONN_MAX_AGE",
+                default=60,
+                cast=int,
+            ),
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": {
+                "connect_timeout": config(
+                    "POSTGRES_CONNECT_TIMEOUT",
+                    default=5,
+                    cast=int,
+                ),
+            },
+        }
+    }
+elif DATABASE_ENGINE == "sqlite":
+    if IS_PRODUCTION:
+        raise ImproperlyConfigured(
+            "Production must use PostgreSQL; SQLite is development-only."
+        )
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    raise ImproperlyConfigured(
+        "DATABASE_ENGINE must be either 'sqlite' or 'postgresql'."
+    )
+
+
+# Production throttling must be shared between application workers.
+CACHES = {
+    "default": {
+        "BACKEND": (
+            "django.core.cache.backends.db.DatabaseCache"
+            if IS_PRODUCTION
+            else "django.core.cache.backends.locmem.LocMemCache"
+        ),
+        "LOCATION": "planificai_cache",
     }
 }
 
@@ -133,16 +190,107 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default=(
+        "django.core.mail.backends.smtp.EmailBackend"
+        if IS_PRODUCTION
+        else "django.core.mail.backends.console.EmailBackend"
+    ),
+)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=IS_PRODUCTION, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default="PlanificaIO <noreply@localhost>",
+)
+ACCOUNT_EMAIL_VERIFICATION_URL = config(
+    "ACCOUNT_EMAIL_VERIFICATION_URL",
+    default="",
+)
+ACCOUNT_PASSWORD_RESET_URL = config("ACCOUNT_PASSWORD_RESET_URL", default="")
+PASSWORD_RESET_TIMEOUT = config(
+    "PASSWORD_RESET_TIMEOUT",
+    default=3600,
+    cast=int,
+)
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+if IS_PRODUCTION and EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
+    raise ImproperlyConfigured(
+        "Production requires a configured email backend."
+    )
+
+SECURE_SSL_REDIRECT = config(
+    "SECURE_SSL_REDIRECT",
+    default=IS_PRODUCTION,
+    cast=bool,
+)
+SESSION_COOKIE_SECURE = config(
+    "SESSION_COOKIE_SECURE",
+    default=IS_PRODUCTION,
+    cast=bool,
+)
+CSRF_COOKIE_SECURE = config(
+    "CSRF_COOKIE_SECURE",
+    default=IS_PRODUCTION,
+    cast=bool,
+)
+SECURE_HSTS_SECONDS = config(
+    "SECURE_HSTS_SECONDS",
+    default=31536000 if IS_PRODUCTION else 0,
+    cast=int,
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=IS_PRODUCTION,
+    cast=bool,
+)
+SECURE_HSTS_PRELOAD = config(
+    "SECURE_HSTS_PRELOAD",
+    default=False,
+    cast=bool,
+)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+
+OPTIMIZATION_TIME_LIMIT_SECONDS = config(
+    "OPTIMIZATION_TIME_LIMIT_SECONDS",
+    default=30,
+    cast=int,
+)
+OPTIMIZATION_MAX_PRODUCTS = config(
+    "OPTIMIZATION_MAX_PRODUCTS",
+    default=100,
+    cast=int,
+)
+OPTIMIZATION_MAX_RESOURCES = config(
+    "OPTIMIZATION_MAX_RESOURCES",
+    default=100,
+    cast=int,
+)
+GROQ_TIMEOUT_SECONDS = config(
+    "GROQ_TIMEOUT_SECONDS",
+    default=20,
+    cast=int,
+)
+
+if (
+    OPTIMIZATION_TIME_LIMIT_SECONDS <= 0
+    or OPTIMIZATION_MAX_PRODUCTS <= 0
+    or OPTIMIZATION_MAX_RESOURCES <= 0
+    or GROQ_TIMEOUT_SECONDS <= 0
+):
+    raise ImproperlyConfigured(
+        "Los límites de optimización y de Groq deben ser mayores que cero."
+    )
 
 # Configuración de Django REST Framework
 REST_FRAMEWORK = {
@@ -153,6 +301,48 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.ApiPagination",
+    "DEFAULT_SCHEMA_CLASS": "config.schema.PlanificaIOSchema",
+    "DEFAULT_THROTTLE_RATES": {
+        "auth_login": "5/min",
+        "auth_refresh": "30/min",
+        "registration": "5/hour",
+        "email_verification": "5/hour",
+        "password_recovery": "3/hour",
+        "password_change": "5/hour",
+        "optimization": "10/hour",
+        "ai_analysis": "10/hour",
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "PlanificaIO API",
+    "DESCRIPTION": (
+        "API de planificación y optimización aislada por workspace. "
+        "Los endpoints protegidos usan JWT Bearer. Los recursos de "
+        "workspace requieren X-Workspace-ID y se autorizan según el "
+        "rol de la membresía. Las listas usan paginación DRF; el "
+        "análisis de IA requiere consentimiento explícito por "
+        "solicitud y una clave Idempotency-Key UUID. Consulte "
+        "docs/backend-operations.md para las reglas de roles, "
+        "privacidad y operación."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "ENUM_NAME_OVERRIDES": {
+        "WorkspaceRoleEnum": [
+            ("OWNER", "Propietario"),
+            ("ADMIN", "Administrador"),
+            ("EDITOR", "Editor"),
+            ("VIEWER", "Visualizador"),
+        ],
+        "AssignableWorkspaceRoleEnum": [
+            ("ADMIN", "ADMIN"),
+            ("EDITOR", "EDITOR"),
+            ("VIEWER", "VIEWER"),
+        ],
+    },
 }
 
 # Configuración de JSON Web Tokens
@@ -163,4 +353,32 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "UPDATE_LAST_LOGIN": False,
+    "CHECK_REVOKE_TOKEN": True,
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": config("LOG_LEVEL", default="INFO"),
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": config("DJANGO_LOG_LEVEL", default="WARNING"),
+            "propagate": False,
+        },
+    },
 }
