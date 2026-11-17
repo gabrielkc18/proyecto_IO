@@ -1,6 +1,7 @@
 
 from decimal import Decimal
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.test import TestCase
 
@@ -10,7 +11,10 @@ from apps.recursos.models import Recurso, ConsumoRecurso
 from apps.optimizacion.models import Ejecucion
 from apps.optimizacion.services.ejecucion import ejecutar_optimizacion
 
-from apps.inteligencia_artificial.models import AnalisisIA
+from apps.inteligencia_artificial.models import (
+    AnalisisIA,
+    SolicitudAnalisisIA,
+)
 from apps.inteligencia_artificial.services.analisis import generar_analisis
 from apps.workspaces.test_utils import crear_workspace_prueba
 
@@ -19,6 +23,7 @@ class GenerarAnalisisTests(TestCase):
 
     def setUp(self):
         self.usuario, self.workspace = crear_workspace_prueba()
+        self.clave_idempotencia = str(uuid4())
         self.problema = Problema.objects.create(
             workspace=self.workspace,
             nombre="Problema análisis IA",
@@ -29,7 +34,7 @@ class GenerarAnalisisTests(TestCase):
         self.producto = Producto.objects.create(
             problema=self.problema,
             codigo="P1",
-            nombre="Producto 1",
+            nombre="Línea especial",
             utilidad_unitaria=Decimal("5.00"),
         )
 
@@ -57,11 +62,15 @@ class GenerarAnalisisTests(TestCase):
 
         ejecucion = ejecutar_optimizacion(self.problema.id)
 
-        analisis = generar_analisis(
+        analisis, replay = generar_analisis(
             ejecucion.id,
             "¿Cuánto debemos producir?",
+            consentimiento_confirmado=True,
+            solicitante=self.usuario,
+            clave_idempotencia=self.clave_idempotencia,
         )
 
+        self.assertFalse(replay)
         self.assertIsInstance(analisis, AnalisisIA)
         self.assertEqual(analisis.ejecucion_id, ejecucion.id)
         self.assertEqual(
@@ -77,11 +86,61 @@ class GenerarAnalisisTests(TestCase):
             "¿Cuánto debemos producir?",
         )
         self.assertIn("productos", analisis.contexto_enviado)
+        self.assertNotIn("Problema análisis IA", str(analisis.contexto_enviado))
+        self.assertNotIn("Línea especial", str(analisis.contexto_enviado))
+        self.assertNotIn("Recurso A", str(analisis.contexto_enviado))
+        self.assertNotIn("snapshot_entrada", analisis.contexto_enviado)
+        self.assertTrue(analisis.consentimiento_confirmado)
+        self.assertIsNotNone(analisis.fecha_consentimiento)
+        self.assertLessEqual(
+            analisis.fecha_consentimiento,
+            analisis.fecha_generacion,
+        )
+        self.assertEqual(
+            analisis.consentimiento_version,
+            "ai-disclosure-v1",
+        )
+        solicitud_enviada = mock_generar.call_args.kwargs["mensajes"][1][
+            "content"
+        ]
+        self.assertNotIn("Línea especial", solicitud_enviada)
+        self.assertNotIn("Recurso A", solicitud_enviada)
+        self.assertNotIn("Problema análisis IA", solicitud_enviada)
+        self.assertNotIn("snapshot_entrada", solicitud_enviada)
         self.assertEqual(AnalisisIA.objects.count(), 1)
+        solicitud_ia = SolicitudAnalisisIA.objects.get()
+        self.assertEqual(
+            solicitud_ia.estado,
+            SolicitudAnalisisIA.Estado.COMPLETED,
+        )
+        self.assertEqual(solicitud_ia.analisis, analisis)
+        self.assertEqual(solicitud_ia.solicitante, self.usuario)
+        self.assertEqual(solicitud_ia.consentimiento_version, "ai-disclosure-v1")
+
+    @patch(
+        "apps.inteligencia_artificial.services.analisis.generar_respuesta"
+    )
+    def test_sin_consentimiento_no_contacta_al_proveedor(self, mock_generar):
+        with self.assertRaisesRegex(ValueError, "consentimiento"):
+            generar_analisis(
+                99999,
+                consentimiento_confirmado=False,
+                solicitante=self.usuario,
+                clave_idempotencia=self.clave_idempotencia,
+            )
+
+        mock_generar.assert_not_called()
+        self.assertEqual(AnalisisIA.objects.count(), 0)
+        self.assertEqual(SolicitudAnalisisIA.objects.count(), 0)
 
     def test_ejecucion_inexistente_genera_error(self):
         with self.assertRaises(ValueError):
-            generar_analisis(99999)
+            generar_analisis(
+                99999,
+                consentimiento_confirmado=True,
+                solicitante=self.usuario,
+                clave_idempotencia=self.clave_idempotencia,
+            )
 
         self.assertEqual(AnalisisIA.objects.count(), 0)
 
@@ -94,7 +153,12 @@ class GenerarAnalisisTests(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            generar_analisis(ejecucion.id)
+            generar_analisis(
+                ejecucion.id,
+                consentimiento_confirmado=True,
+                solicitante=self.usuario,
+                clave_idempotencia=self.clave_idempotencia,
+            )
 
         self.assertEqual(AnalisisIA.objects.count(), 0)
 
@@ -108,7 +172,12 @@ class GenerarAnalisisTests(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            generar_analisis(ejecucion.id)
+            generar_analisis(
+                ejecucion.id,
+                consentimiento_confirmado=True,
+                solicitante=self.usuario,
+                clave_idempotencia=self.clave_idempotencia,
+            )
 
         self.assertEqual(AnalisisIA.objects.count(), 0)
 
@@ -123,6 +192,16 @@ class GenerarAnalisisTests(TestCase):
         ejecucion = ejecutar_optimizacion(self.problema.id)
 
         with self.assertRaises(RuntimeError):
-            generar_analisis(ejecucion.id)
+            generar_analisis(
+                ejecucion.id,
+                consentimiento_confirmado=True,
+                solicitante=self.usuario,
+                clave_idempotencia=self.clave_idempotencia,
+            )
 
         self.assertEqual(AnalisisIA.objects.count(), 0)
+        solicitud_ia = SolicitudAnalisisIA.objects.get()
+        self.assertEqual(
+            solicitud_ia.estado,
+            SolicitudAnalisisIA.Estado.FAILED,
+        )

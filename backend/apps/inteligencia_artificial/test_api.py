@@ -62,7 +62,7 @@ class AnalisisIAAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_analisis_por_ejecucion(self):
         response = self.client.get(
@@ -74,7 +74,7 @@ class AnalisisIAAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_analisis_por_problema(self):
         response = self.client.get(
@@ -86,7 +86,7 @@ class AnalisisIAAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_consultar_analisis(self):
         url = reverse(
@@ -175,9 +175,9 @@ class AnalisisIAAPITests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = [item["id"] for item in response.data]
+        ids = [item["id"] for item in response.data["results"]]
         self.assertNotIn(analisis_externo.pk, ids)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_consultar_analisis_de_otro_workspace(self):
         _, otro_workspace = crear_workspace_prueba()
