@@ -1,4 +1,7 @@
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.db.models.deletion import ProtectedError
@@ -179,3 +182,55 @@ class SolverTest(SimpleTestCase):
 
         with self.assertRaises(ValueError):
             resolver_problema(productos, self.recursos)
+
+    def test_rechazar_consumos_negativos(self):
+        recursos = [
+            {
+                "nombre": "Materia A",
+                "disponibilidad": 10,
+                "consumos": {"P1": -1},
+            }
+        ]
+
+        with self.assertRaisesRegex(ValueError, "consumos no pueden ser negativos"):
+            resolver_problema(self.productos, recursos)
+
+    def test_modelo_no_acotado_devuelve_estado_sin_fabricar_resultados(self):
+        productos = [{"codigo": "P1", "utilidad_unitaria": 5}]
+        recursos = [
+            {
+                "nombre": "Materia A",
+                "disponibilidad": 10,
+                "consumos": {"P1": 0},
+            }
+        ]
+
+        resultado = resolver_problema(productos, recursos, "MAX", time_limit=5)
+
+        self.assertEqual(resultado["estado"], "Unbounded")
+        self.assertIsNone(resultado["utilidad_total"])
+        self.assertEqual(resultado["productos"], [])
+        self.assertEqual(resultado["recursos"], [])
+
+    def test_timeout_del_solver_retorna_estado_no_resuelto(self):
+        with (
+            patch(
+                "apps.optimizacion.services.solver.pulp.COIN_CMD",
+            ) as solver_factory,
+            patch(
+                "apps.optimizacion.services.solver.pulp.LpProblem.solve",
+                return_value=SimpleNamespace(status_str="Not Solved"),
+            ) as solve,
+        ):
+            resultado = resolver_problema(
+                self.productos,
+                self.recursos,
+                "MAX",
+                time_limit=7,
+            )
+
+        solver_factory.assert_called_once_with(msg=False, timeLimit=7)
+        solve.assert_called_once_with(solver_factory.return_value)
+        self.assertEqual(resultado["estado"], "Not Solved")
+        self.assertIsNone(resultado["utilidad_total"])
+        self.assertEqual(resultado["productos"], [])

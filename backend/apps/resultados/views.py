@@ -36,7 +36,7 @@ class ResultadoProductoViewSet(
                 ejecucion__problema_id=problema_id
             )
 
-        return queryset
+        return queryset.order_by("pk")
 
 
 class ResultadoRecursoViewSet(
@@ -66,4 +66,4 @@ class ResultadoRecursoViewSet(
                 ejecucion__problema_id=problema_id
             )
 
-        return queryset
+        return queryset.order_by("pk")

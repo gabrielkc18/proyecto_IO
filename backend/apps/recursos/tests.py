@@ -66,6 +66,16 @@ class ConsumoRecursoModelTest(TestCase):
         with self.assertRaises(ValidationError):
             consumo.full_clean()
 
+    def test_save_rechaza_producto_y_recurso_de_problemas_diferentes(self):
+        with self.assertRaises(ValidationError):
+            ConsumoRecurso.objects.create(
+                producto=self.producto,
+                recurso=self.recurso_b,
+                cantidad_por_unidad=4,
+            )
+
+        self.assertEqual(ConsumoRecurso.objects.count(), 0)
+
     def test_consumo_no_puede_ser_negativo(self):
         consumo = ConsumoRecurso(
             producto=self.producto,

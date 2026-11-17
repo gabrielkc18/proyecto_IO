@@ -22,7 +22,7 @@ class RecursoViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
         if problema_id:
             queryset = queryset.filter(problema_id=problema_id)
 
-        return queryset
+        return queryset.order_by("pk")
 
 
 class ConsumoRecursoViewSet(
@@ -62,4 +62,4 @@ class ConsumoRecursoViewSet(
         if recurso_id:
             queryset = queryset.filter(recurso_id=recurso_id)
 
-        return queryset
+        return queryset.order_by("pk")

@@ -12,7 +12,7 @@ class ProblemaViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         return Problema.objects.filter(
             workspace=self.get_workspace()
-        ).select_related("workspace")
+        ).select_related("workspace").order_by("pk")
 
     def perform_create(self, serializer):
         serializer.save(workspace=self.get_workspace())

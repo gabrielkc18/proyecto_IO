@@ -50,7 +50,16 @@ class ProductoAPITests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
+
+    def test_paginacion_devuelve_metadatos_y_orden_estable(self):
+        response = self.client.get(self.url, {"page_size": 1})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNotNone(response.data["next"])
+        self.assertEqual(response.data["results"][0]["id"], self.producto.pk)
 
     def test_filtrar_productos_por_problema(self):
         response = self.client.get(
@@ -59,8 +68,8 @@ class ProductoAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["codigo"], "P1")
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["codigo"], "P1")
 
     def test_consultar_producto(self):
         url = reverse(

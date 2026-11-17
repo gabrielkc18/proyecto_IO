@@ -93,7 +93,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_resultados_productos_por_ejecucion(self):
         response = self.client.get(
@@ -105,7 +105,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_resultados_productos_por_problema(self):
         response = self.client.get(
@@ -117,7 +117,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_consultar_resultado_producto(self):
         url = reverse(
@@ -153,7 +153,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_resultados_recursos_por_ejecucion(self):
         response = self.client.get(
@@ -165,7 +165,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_resultados_recursos_por_problema(self):
         response = self.client.get(
@@ -177,7 +177,7 @@ class ResultadosAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_consultar_resultado_recurso(self):
         url = reverse(
@@ -231,9 +231,9 @@ class ResultadosAPITests(APITestCase):
         response = self.client.get(self.productos_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = [item["id"] for item in response.data]
+        ids = [item["id"] for item in response.data["results"]]
         self.assertNotIn(resultado_externo.pk, ids)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_consultar_resultado_producto_de_otro_workspace(self):
         _, otro_workspace = crear_workspace_prueba()
@@ -299,9 +299,9 @@ class ResultadosAPITests(APITestCase):
         response = self.client.get(self.recursos_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = [item["id"] for item in response.data]
+        ids = [item["id"] for item in response.data["results"]]
         self.assertNotIn(resultado_externo.pk, ids)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_consultar_resultado_recurso_de_otro_workspace(self):
         _, otro_workspace = crear_workspace_prueba()

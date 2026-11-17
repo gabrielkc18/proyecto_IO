@@ -1,6 +1,8 @@
 
 from decimal import Decimal, ROUND_HALF_UP
+import logging
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -11,6 +13,9 @@ from apps.optimizacion.models import Ejecucion
 from apps.resultados.models import ResultadoProducto, ResultadoRecurso
 
 from apps.optimizacion.services.solver import resolver_problema
+
+
+logger = logging.getLogger(__name__)
 
 
 def a_decimal(valor):
@@ -54,16 +59,31 @@ def ejecutar_optimizacion(problema_id):
     if not recursos_db:
         raise ValueError("El problema no tiene recursos activos.")
 
+    if len(productos_db) > settings.OPTIMIZATION_MAX_PRODUCTS:
+        raise ValueError(
+            "El problema supera el límite de productos por ejecución."
+        )
+    if len(recursos_db) > settings.OPTIMIZATION_MAX_RESOURCES:
+        raise ValueError(
+            "El problema supera el límite de recursos por ejecución."
+        )
+
     # 2. Consultar consumos asociados al problema
-    consumos_db = ConsumoRecurso.objects.filter(
-        producto__problema=problema,
-        recurso__problema=problema,
-        producto__activo=True,
-        recurso__activo=True
-    ).select_related("producto", "recurso")
+    consumos_db = list(
+        ConsumoRecurso.objects.filter(
+            producto__problema=problema,
+            recurso__problema=problema,
+            producto__activo=True,
+            recurso__activo=True,
+        ).select_related("producto", "recurso")
+    )
 
     # 3. Construir la estructura de consumos
     consumos_por_recurso = {
+        recurso.id: {}
+        for recurso in recursos_db
+    }
+    consumos_para_snapshot = {
         recurso.id: {}
         for recurso in recursos_db
     }
@@ -72,6 +92,9 @@ def ejecutar_optimizacion(problema_id):
         consumos_por_recurso[consumo.recurso_id][
             consumo.producto.codigo
         ] = float(consumo.cantidad_por_unidad)
+        consumos_para_snapshot[consumo.recurso_id][
+            consumo.producto.codigo
+        ] = str(consumo.cantidad_por_unidad)
 
     # 4. Preparar los datos para PuLP
     productos_solver = [
@@ -115,18 +138,7 @@ def ejecutar_optimizacion(problema_id):
                 "nombre": recurso.nombre,
                 "unidad_medida": recurso.unidad_medida,
                 "disponibilidad": str(recurso.disponibilidad),
-                "consumos": {
-                    codigo: str(cantidad)
-                    for codigo, cantidad in (
-                        ConsumoRecurso.objects.filter(
-                            recurso=recurso,
-                            producto__in=productos_db
-                        ).values_list(
-                            "producto__codigo",
-                            "cantidad_por_unidad"
-                        )
-                    )
-                }
+                "consumos": consumos_para_snapshot[recurso.id],
             }
             for recurso in recursos_db
         ]
@@ -145,7 +157,8 @@ def ejecutar_optimizacion(problema_id):
         resultado = resolver_problema(
             productos_solver,
             recursos_solver,
-            sentido
+            sentido,
+            time_limit=settings.OPTIMIZATION_TIME_LIMIT_SECONDS,
         )
 
         estado_solver = resultado["estado"]
@@ -219,9 +232,17 @@ def ejecutar_optimizacion(problema_id):
             ejecucion.fecha_fin = timezone.now()
             ejecucion.save()
 
-    except Exception as error:
+    except Exception:
+        logger.exception(
+            "Falló una ejecución de optimización "
+            "execution_id=%s problem_id=%s",
+            ejecucion.pk,
+            problema.pk,
+        )
         ejecucion.estado_proceso = Ejecucion.EstadoProceso.ERROR
-        ejecucion.mensaje_error = str(error)
+        ejecucion.mensaje_error = (
+            "La ejecución no pudo completarse. Contacta al soporte."
+        )
         ejecucion.fecha_fin = timezone.now()
         ejecucion.save(
             update_fields=[

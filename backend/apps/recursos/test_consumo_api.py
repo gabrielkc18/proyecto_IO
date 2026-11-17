@@ -74,7 +74,7 @@ class ConsumoRecursoAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_consumos_por_problema(self):
         response = self.client.get(
@@ -86,7 +86,7 @@ class ConsumoRecursoAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_filtrar_consumos_por_producto(self):
         response = self.client.get(
@@ -98,7 +98,7 @@ class ConsumoRecursoAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_crear_consumo(self):
         data = {

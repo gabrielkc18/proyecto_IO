@@ -50,7 +50,7 @@ class EjecucionAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_filtrar_ejecuciones_por_problema(self):
         response = self.client.get(
@@ -62,7 +62,7 @@ class EjecucionAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_consultar_ejecucion(self):
         url = reverse(
@@ -144,9 +144,9 @@ class EjecucionAPITests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = [item["id"] for item in response.data]
+        ids = [item["id"] for item in response.data["results"]]
         self.assertNotIn(ejecucion_externa.pk, ids)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_no_consultar_ejecucion_de_otro_workspace(self):
         _, otro_workspace = crear_workspace_prueba()

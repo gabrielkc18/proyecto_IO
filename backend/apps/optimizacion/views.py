@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from apps.workspaces.mixins import WorkspaceContextMixin
 from apps.problemas.models import Problema
@@ -30,7 +31,7 @@ class EjecucionViewSet(
         if problema_id:
             queryset = queryset.filter(problema_id=problema_id)
 
-        return queryset
+        return queryset.order_by("pk")
 
 
 class ProblemaOptimizacionViewSet(
@@ -38,11 +39,23 @@ class ProblemaOptimizacionViewSet(
     viewsets.GenericViewSet,
 ):
     queryset = Problema.objects.all()
+    serializer_class = EjecucionSerializer
 
     @action(
         detail=True,
         methods=["post"],
         url_path="ejecutar",
+    )
+    @extend_schema(
+        responses={
+            201: EjecucionSerializer,
+            400: OpenApiResponse(description="El problema no se puede ejecutar."),
+            404: OpenApiResponse(description="Problema no encontrado."),
+        },
+        description=(
+            "Ejecuta el problema del workspace activo. Requiere rol "
+            "OWNER, ADMIN o EDITOR."
+        ),
     )
     def ejecutar(self, request, pk=None):
         problema = Problema.objects.filter(

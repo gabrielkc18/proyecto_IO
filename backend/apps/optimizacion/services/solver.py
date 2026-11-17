@@ -2,7 +2,13 @@
 import pulp
 
 
-def resolver_problema(productos, recursos, sentido_objetivo="MAX"):
+def resolver_problema(
+    productos,
+    recursos,
+    sentido_objetivo="MAX",
+    *,
+    time_limit=30,
+):
     """
     Resuelve un problema de optimización de producción entera.
 
@@ -98,7 +104,12 @@ def resolver_problema(productos, recursos, sentido_objetivo="MAX"):
         modelo += consumo_total <= recurso["disponibilidad"]
 
     # 6. Ejecutar el solver
-    stats = modelo.solve(pulp.COIN_CMD(msg=False))
+    stats = modelo.solve(
+        pulp.COIN_CMD(
+            msg=False,
+            timeLimit=time_limit,
+        )
+    )
 
     estado = stats.status_str
 

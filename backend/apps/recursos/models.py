@@ -84,6 +84,10 @@ class ConsumoRecurso(models.Model):
                     "al mismo problema."
                 )
 
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
+
     class Meta:
         verbose_name = "Consumo de recurso"
         verbose_name_plural = "Consumos de recursos"

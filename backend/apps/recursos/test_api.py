@@ -53,7 +53,7 @@ class RecursoAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_filtrar_recursos_por_problema(self):
         response = self.client.get(
@@ -65,9 +65,9 @@ class RecursoAPITests(APITestCase):
             response.status_code,
             status.HTTP_200_OK
         )
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(
-            response.data[0]["nombre"],
+            response.data["results"][0]["nombre"],
             "Materia prima A"
         )
 

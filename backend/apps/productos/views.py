@@ -22,4 +22,4 @@ class ProductoViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
         if problema_id:
             queryset = queryset.filter(problema_id=problema_id)
 
-        return queryset
+        return queryset.order_by("pk")

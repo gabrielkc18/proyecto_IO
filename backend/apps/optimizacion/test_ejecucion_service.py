@@ -1,7 +1,8 @@
 
 from decimal import Decimal
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.problemas.models import Problema
 from apps.productos.models import Producto
@@ -101,6 +102,20 @@ class EjecucionServiceTests(TestCase):
 
         self.assertEqual(Ejecucion.objects.count(), 0)
 
+    @override_settings(OPTIMIZATION_MAX_PRODUCTS=0)
+    def test_limite_de_productos_se_aplica_antes_de_crear_ejecucion(self):
+        with self.assertRaisesRegex(ValueError, "límite de productos"):
+            ejecutar_optimizacion(self.problema.id)
+
+        self.assertEqual(Ejecucion.objects.count(), 0)
+
+    @override_settings(OPTIMIZATION_MAX_RESOURCES=0)
+    def test_limite_de_recursos_se_aplica_antes_de_crear_ejecucion(self):
+        with self.assertRaisesRegex(ValueError, "límite de recursos"):
+            ejecutar_optimizacion(self.problema.id)
+
+        self.assertEqual(Ejecucion.objects.count(), 0)
+
     def test_error_del_solver_se_registra_en_ejecucion(self):
         from unittest.mock import patch
 
@@ -115,7 +130,64 @@ class EjecucionServiceTests(TestCase):
             Ejecucion.EstadoProceso.ERROR,
         )
         self.assertIn(
+            "Contacta al soporte",
+            ejecucion.mensaje_error,
+        )
+        self.assertNotIn(
             "Error simulado del solver",
             ejecucion.mensaje_error,
         )
         self.assertIsNotNone(ejecucion.fecha_fin)
+
+    def test_estados_no_optimos_persisten_sin_resultados(self):
+        estados = (
+            Ejecucion.EstadoSolver.INFEASIBLE,
+            Ejecucion.EstadoSolver.UNBOUNDED,
+            Ejecucion.EstadoSolver.NOT_SOLVED,
+            Ejecucion.EstadoSolver.UNDEFINED,
+        )
+
+        for estado in estados:
+            with self.subTest(estado=estado):
+                with patch(
+                    "apps.optimizacion.services.ejecucion.resolver_problema",
+                    return_value={
+                        "estado": estado,
+                        "utilidad_total": None,
+                        "productos": [],
+                        "recursos": [],
+                    },
+                ):
+                    ejecucion = ejecutar_optimizacion(self.problema.id)
+
+                self.assertEqual(
+                    ejecucion.estado_proceso,
+                    Ejecucion.EstadoProceso.TERMINADO,
+                )
+                self.assertEqual(ejecucion.estado_solver, estado)
+                self.assertIsNone(ejecucion.utilidad_total)
+                self.assertFalse(
+                    ResultadoProducto.objects.filter(ejecucion=ejecucion).exists()
+                )
+                self.assertFalse(
+                    ResultadoRecurso.objects.filter(ejecucion=ejecucion).exists()
+                )
+
+    def test_fallo_al_persistir_resultados_revierte_escrituras_parciales(self):
+        with patch(
+            "apps.optimizacion.services.ejecucion.ResultadoRecurso.objects.create",
+            side_effect=RuntimeError("fallo de persistencia"),
+        ):
+            ejecucion = ejecutar_optimizacion(self.problema.id)
+
+        self.assertEqual(
+            ejecucion.estado_proceso,
+            Ejecucion.EstadoProceso.ERROR,
+        )
+        self.assertNotIn("fallo de persistencia", ejecucion.mensaje_error)
+        self.assertFalse(
+            ResultadoProducto.objects.filter(ejecucion=ejecucion).exists()
+        )
+        self.assertFalse(
+            ResultadoRecurso.objects.filter(ejecucion=ejecucion).exists()
+        )
