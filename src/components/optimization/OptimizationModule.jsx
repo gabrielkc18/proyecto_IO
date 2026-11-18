@@ -1,0 +1,52 @@
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Boxes, Download, Eye, LoaderCircle, Package, Search, Sparkles, TrendingUp } from 'lucide-react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+export function OptimizationExecution({ isOptimizing, error, onRun }) {
+  return <section className="bg-white p-8 rounded-2xl border border-blue-100 shadow-sm text-center space-y-5">
+    <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#3B82F6] flex items-center justify-center mx-auto"><LoaderCircle className={`w-8 h-8 ${isOptimizing ? 'animate-spin' : ''}`} /></div>
+    <div><h3 className="text-lg font-bold text-[#172554]">{isOptimizing ? 'Procesando escenario demostrativo…' : 'Ejecución demostrativa'}</h3>
+      <p className="text-xs text-gray-500 mt-2 max-w-xl mx-auto">Esta vista presenta datos de ejemplo. No se ha conectado un solucionador matemático ni se afirma optimalidad.</p></div>
+    {error && <p role="alert" className="text-xs text-rose-600">{error}</p>}
+    {isOptimizing ? <div className="h-2 bg-blue-100 rounded-full max-w-md mx-auto overflow-hidden"><div className="h-full bg-[#3B82F6] animate-pulse w-3/4 rounded-full" /></div> : <button onClick={onRun} className="px-6 py-3 bg-[#3B82F6] hover:bg-[#1E40AF] text-white text-sm font-semibold rounded-xl">Optimizar modelo (demostración)</button>}
+  </section>;
+}
+
+export function OptimizationResults({ result, onBack, onHistory, onExport }) {
+  if (!result) return null;
+  const totalUnits = result.produced.reduce((sum, item) => sum + item.quantity, 0);
+  const baseline = result.baselineProfit;
+  const gain = baseline > 0 ? ((result.profit - baseline) / baseline) * 100 : null;
+  const priorities = result.produced.filter(item => item.quantity > 0).sort((a, b) => b.totalProfit - a.totalProfit);
+  const tight = result.resourceUsage.filter(resource => resource.isBottleneck);
+  const slack = result.resourceUsage.filter(resource => !resource.isBottleneck);
+  return <div className="space-y-6">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><strong>Escenario demostrativo.</strong> Las cantidades y la utilidad son de ejemplo; no representan una solución óptima verificada.</div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <Kpi icon={<span className="text-xl font-bold">$</span>} title="Utilidad del escenario" value={`$${result.profit.toLocaleString()}`} />
+      <Kpi icon={<TrendingUp className="w-6 h-6" />} title="Incremento vs. referencia" value={gain === null ? 'Sin referencia' : `${gain >= 0 ? '+' : ''}${gain.toFixed(1)}%`} />
+      <Kpi icon={<AlertTriangle className="w-6 h-6" />} title="Recursos agotados" value={tight.length ? tight.map(r => r.name).join(', ') : 'Ninguno'} />
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4"><h3 className="font-bold text-[#172554] text-sm flex items-center gap-2"><Package className="w-4 h-4 text-[#3B82F6]" /> Mezcla de producción (ejemplo)</h3>
+        <div className="overflow-x-auto border border-blue-100 rounded-xl"><table className="w-full text-left text-xs"><thead className="bg-[#EFF6FF] text-[#172554] uppercase"><tr><th className="p-3">Producto</th><th className="p-3 text-right">Cantidad (u)</th><th className="p-3 text-right">Utilidad</th></tr></thead><tbody className="divide-y divide-gray-100">{result.produced.map(item => <tr key={item.code}><td className="p-3 font-semibold">{item.code} · {item.name}</td><td className="p-3 text-right">{item.quantity.toLocaleString()}</td><td className="p-3 text-right">${item.totalProfit.toLocaleString()}</td></tr>)}<tr className="bg-blue-50/60 font-bold"><td className="p-3">Total de unidades</td><td className="p-3 text-right">{totalUnits.toLocaleString()}</td><td className="p-3 text-right">${result.profit.toLocaleString()}</td></tr></tbody></table></div>
+      </div>
+      <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4"><div className="flex justify-between items-center"><h3 className="font-bold text-[#172554] text-sm flex items-center gap-2"><Boxes className="w-4 h-4 text-[#3B82F6]" /> Uso y holgura de recursos</h3><button onClick={onExport} className="px-3 py-1.5 bg-[#EFF6FF] text-[#1E40AF] text-xs font-semibold rounded-lg flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Exportar</button></div>
+        <div className="overflow-x-auto border border-blue-100 rounded-xl"><table className="w-full text-left text-xs"><thead className="bg-[#EFF6FF] text-[#172554] uppercase"><tr><th className="p-3">Recurso</th><th className="p-3 text-right">Consumo</th><th className="p-3 text-right">Disponibilidad</th><th className="p-3 text-right">Holgura</th></tr></thead><tbody className="divide-y divide-gray-100">{result.resourceUsage.map(r => <tr key={r.id}><td className="p-3 font-semibold">{r.name}</td><td className="p-3 text-right">{r.used.toLocaleString()} {r.unit}</td><td className="p-3 text-right">{r.capacity.toLocaleString()} {r.unit}</td><td className={`p-3 text-right font-bold ${r.isBottleneck ? 'text-rose-600' : 'text-emerald-600'}`}>{r.slack.toLocaleString()} {r.unit}{r.isBottleneck ? ' · Agotado' : ''}</td></tr>)}</tbody></table></div>
+      </div>
+    </div>
+    <div className="bg-gradient-to-br from-[#172554] to-[#1E40AF] p-6 rounded-2xl text-white shadow-lg space-y-3"><div className="flex items-center gap-3"><Sparkles className="w-5 h-5 text-amber-300" /><h3 className="font-bold">Interpretación demostrativa (IA)</h3></div><p className="text-xs text-blue-100">Esta explicación es una demostración y no proviene de un servicio de IA. En este escenario conviene revisar {priorities.length ? priorities.slice(0, 2).map(item => `${item.code} (${item.quantity} unidades)`).join(' y ') : 'la mezcla de producción'}. La utilidad calculada del escenario es <strong className="text-white">${result.profit.toLocaleString()}</strong>. {tight.length ? `Los recursos más comprometidos son ${tight.map(r => r.name).join(' y ')}.` : 'Ningún recurso está agotado.'} {slack.length ? `Hay holgura en ${slack.map(r => r.name).join(' y ')}.` : ''} Se puede evaluar modificar capacidades y consumos en escenarios posteriores.</p><p className="text-[11px] text-blue-200">La solución matemática corresponderá al solucionador de Investigación de Operaciones cuando se conecte.</p></div>
+    <div className="flex justify-between"><button onClick={onBack} className="px-5 py-2.5 border rounded-xl text-xs">← Editar datos</button><button onClick={onHistory} className="px-6 py-2.5 bg-[#3B82F6] text-white text-xs font-semibold rounded-xl">Ver historial →</button></div>
+  </div>;
+}
+
+export function OptimizationHistory({ history, onDetail }) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('todos');
+  const rows = useMemo(() => history.filter(item => item.name.toLowerCase().includes(query.toLowerCase()) && (status === 'todos' || item.status.toLowerCase() === status)), [history, query, status]);
+  return <div className="space-y-6 animate-fade-in"><div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4"><div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4"><div><h2 className="text-xl font-bold text-[#172554]">Historial de ejecuciones</h2><p className="text-xs text-gray-500">Las ejecuciones disponibles son demostrativas.</p></div><div className="flex items-center gap-3"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar escenario…" className="w-full sm:w-64 pl-9 pr-4 py-2 border rounded-xl text-xs" /></div><select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2 border rounded-xl text-xs bg-white"><option value="todos">Todos</option><option value="completado">Completado</option></select></div></div>
+    <div className="overflow-x-auto border border-blue-100 rounded-xl"><table className="w-full text-left text-xs"><thead className="bg-[#EFF6FF] text-[#172554] uppercase"><tr><th className="p-3.5">Fecha</th><th className="p-3.5">Escenario</th><th className="p-3.5">Utilidad</th><th className="p-3.5">Estado</th><th className="p-3.5 text-right">Acciones</th></tr></thead><tbody className="divide-y">{rows.map(item => <tr key={item.id}><td className="p-3.5 text-gray-500">{item.date}</td><td className="p-3.5 font-bold text-[#172554]">{item.name}</td><td className="p-3.5 font-extrabold text-emerald-600">${item.profit.toLocaleString()}</td><td className="p-3.5"><span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full">{item.status}</span></td><td className="p-3.5 text-right"><button onClick={() => onDetail(item)} className="text-blue-600 inline-flex items-center gap-1"><Eye className="w-4 h-4" />Detalle</button></td></tr>)}{!rows.length && <tr><td colSpan="5" className="p-6 text-center text-gray-500">No hay ejecuciones que coincidan.</td></tr>}</tbody></table></div></div>
+    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4"><h3 className="font-bold text-[#172554] text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-[#3B82F6]" /> Comparativa de utilidades</h3><div className="h-64"><ResponsiveContainer width="100%" height="100%"><LineChart data={[...history].reverse()}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis tickFormatter={v => `$${v / 1000}k`} tick={{ fontSize: 10 }} /><Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ''} formatter={v => [`$${Number(v).toLocaleString()}`, 'Utilidad del escenario']} /><Line type="monotone" dataKey="profit" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#1E40AF' }} /></LineChart></ResponsiveContainer></div></div></div>;
+}
+
+function Kpi({ icon, title, value }) { return <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-blue-100 text-[#3B82F6] flex items-center justify-center">{icon}</div><div><span className="text-xs font-semibold text-gray-500 uppercase">{title}</span><p className="text-lg font-extrabold text-[#172554]">{value}</p></div></div>; }
