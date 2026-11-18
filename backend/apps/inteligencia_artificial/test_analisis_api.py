@@ -122,6 +122,8 @@ class GenerarAnalisisAPITests(APITestCase):
             format="json",
             HTTP_IDEMPOTENCY_KEY=self.idempotency_key,
         )
+        self.ejecucion.snapshot_entrada = {}
+        self.ejecucion.save(update_fields=["snapshot_entrada"])
         replay = self.client.post(
             self.url,
             payload,
@@ -135,6 +137,23 @@ class GenerarAnalisisAPITests(APITestCase):
         self.assertEqual(AnalisisIA.objects.count(), 1)
         self.assertEqual(SolicitudAnalisisIA.objects.count(), 1)
         mock_generar.assert_called_once()
+
+    @patch("apps.inteligencia_artificial.services.analisis.generar_respuesta")
+    def test_sin_sentido_historico_rechaza_nuevo_analisis(self, mock_generar):
+        self.ejecucion.snapshot_entrada = {}
+        self.ejecucion.save(update_fields=["snapshot_entrada"])
+
+        respuesta = self.client.post(
+            self.url,
+            {"consentimiento_confirmado": True},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=self.idempotency_key,
+        )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("sentido objetivo histórico", respuesta.data["error"])
+        self.assertFalse(SolicitudAnalisisIA.objects.exists())
+        mock_generar.assert_not_called()
 
     @patch(
         "apps.inteligencia_artificial.services.analisis.generar_respuesta"

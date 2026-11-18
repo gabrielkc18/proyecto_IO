@@ -1,5 +1,6 @@
 
 from apps.optimizacion.models import Ejecucion
+from apps.problemas.models import Problema
 from apps.resultados.models import (
     ResultadoProducto,
     ResultadoRecurso,
@@ -13,9 +14,7 @@ def construir_contexto(ejecucion_id):
     """
 
     try:
-        ejecucion = Ejecucion.objects.select_related(
-            "problema"
-        ).get(pk=ejecucion_id)
+        ejecucion = Ejecucion.objects.get(pk=ejecucion_id)
 
     except Ejecucion.DoesNotExist:
         raise ValueError(
@@ -27,19 +26,24 @@ def construir_contexto(ejecucion_id):
             "No se puede analizar una ejecución que no haya terminado."
         )
 
+    snapshot = ejecucion.snapshot_entrada
+    sentido = snapshot.get("sentido_objetivo") if isinstance(snapshot, dict) else None
+    if sentido not in Problema.SentidoObjetivo.values:
+        raise ValueError("La ejecución no registra un sentido objetivo histórico válido.")
+
     productos = ResultadoProducto.objects.filter(
         ejecucion=ejecucion
-    ).order_by("nombre_producto")
+    ).order_by("nombre_producto", "producto_id")
 
     recursos = ResultadoRecurso.objects.filter(
         ejecucion=ejecucion
-    ).order_by("nombre_recurso")
+    ).order_by("nombre_recurso", "recurso_id")
 
     contexto = {
         "problema": {
             "id": ejecucion.problema_id,
-            "nombre": ejecucion.problema.nombre,
-            "sentido_objetivo": ejecucion.problema.sentido_objetivo,
+            "nombre": snapshot.get("nombre_problema"),
+            "sentido_objetivo": sentido,
         },
         "ejecucion": {
             "id": ejecucion.id,
@@ -76,7 +80,7 @@ def construir_contexto(ejecucion_id):
             }
             for recurso in recursos
         ],
-        "snapshot_entrada": ejecucion.snapshot_entrada,
+        "snapshot_entrada": snapshot,
     }
 
     return contexto

@@ -46,6 +46,9 @@ class ContextoIATests(TestCase):
 
     def test_construye_contexto_de_ejecucion_optima(self):
         ejecucion = ejecutar_optimizacion(self.problema.id)
+        self.problema.nombre = "Nombre actual"
+        self.problema.sentido_objetivo = Problema.SentidoObjetivo.MINIMIZAR
+        self.problema.save(update_fields=["nombre", "sentido_objetivo"])
 
         contexto = construir_contexto(ejecucion.id)
 
@@ -53,6 +56,7 @@ class ContextoIATests(TestCase):
             contexto["problema"]["nombre"],
             "Problema contexto IA",
         )
+        self.assertEqual(contexto["problema"]["sentido_objetivo"], "MAXIMIZAR")
 
         self.assertEqual(
             contexto["ejecucion"]["estado_solver"],

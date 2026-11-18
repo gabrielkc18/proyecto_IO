@@ -29,6 +29,26 @@ class ConflictoIdempotencia(Exception):
     pass
 
 
+def recuperar_analisis(solicitud, ejecucion_id, pregunta):
+    if solicitud.ejecucion_id != ejecucion_id:
+        raise ConflictoIdempotencia(
+            "La clave Idempotency-Key ya se usó con otros datos."
+        )
+
+    if solicitud.estado == SolicitudAnalisisIA.Estado.COMPLETED and solicitud.analisis_id:
+        analisis = solicitud.analisis
+        if analisis.pregunta == pregunta:
+            return analisis, True
+        raise ConflictoIdempotencia(
+            "La clave Idempotency-Key ya se usó con otros datos."
+        )
+
+    raise ConflictoIdempotencia(
+        "La solicitud ya fue recibida y no se repetirá. "
+        "Usa una nueva Idempotency-Key para un nuevo intento."
+    )
+
+
 def marcar_solicitud_fallida(solicitud_id, error):
     with transaction.atomic():
         solicitud_ia = SolicitudAnalisisIA.objects.select_for_update().get(
@@ -104,6 +124,14 @@ def generar_analisis(
             "Solo se pueden analizar ejecuciones con solución óptima."
         )
 
+    solicitudes = SolicitudAnalisisIA.objects.filter(
+        solicitante=solicitante,
+        clave_idempotencia=clave_idempotencia,
+    )
+    solicitud_existente = solicitudes.select_related("analisis").first()
+    if solicitud_existente is not None:
+        return recuperar_analisis(solicitud_existente, ejecucion.pk, pregunta)
+
     contexto = minimizar_contexto(construir_contexto(ejecucion_id))
     huella = hashlib.sha256(
         json.dumps(
@@ -131,26 +159,12 @@ def generar_analisis(
                 fecha_consentimiento=fecha_consentimiento,
                 consentimiento_version=CONSENTIMIENTO_VERSION,
             )
-    except IntegrityError as error:
+    except IntegrityError:
         with transaction.atomic():
-            solicitud_ia = SolicitudAnalisisIA.objects.select_for_update().filter(
-                solicitante=solicitante,
-                clave_idempotencia=clave_idempotencia,
-            ).first()
+            solicitud_ia = solicitudes.select_for_update().first()
             if solicitud_ia is None:
-                raise error
-            if solicitud_ia.huella_solicitud != huella:
-                raise ConflictoIdempotencia(
-                    "La clave Idempotency-Key ya se usó con otros datos."
-                ) from error
-            if solicitud_ia.estado == SolicitudAnalisisIA.Estado.COMPLETED:
-                analisis_existente = solicitud_ia.analisis
-                if analisis_existente is not None:
-                    return analisis_existente, True
-            raise ConflictoIdempotencia(
-                "La solicitud ya fue recibida y no se repetirá. "
-                "Usa una nueva Idempotency-Key para un nuevo intento."
-            ) from error
+                raise
+            return recuperar_analisis(solicitud_ia, ejecucion.pk, pregunta)
 
     contexto_json = json.dumps(contexto, ensure_ascii=False, indent=2)
 

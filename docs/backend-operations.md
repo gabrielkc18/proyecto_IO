@@ -226,6 +226,8 @@ La solicitud requiere `Idempotency-Key` con un UUID. Un reintento con la misma c
 
 La versión `ai-disclosure-v1` envía a Groq el sentido objetivo, estado del solver, utilidad total, valores unitarios/cantidades/utilidades aportadas de productos, disponibilidad/consumo/holgura/uso y unidad de medida de recursos, además de la pregunta escrita por el usuario. No se envían nombres, códigos, IDs, snapshots de entrada, nombres de usuario, correo, tokens ni contraseñas. El contexto minimizado también se conserva en el análisis interno para trazabilidad. Evita incluir datos personales o secretos en la pregunta.
 
+El sentido objetivo se toma del snapshot de la ejecución. Si una ejecución antigua carece de ese dato, una solicitud nueva devuelve `400`. El mismo usuario puede recuperar un análisis ya completado con la misma clave, ejecución y pregunta.
+
 El backend almacena cada aceptación con su fecha, versión de la declaración, ID del usuario autenticado, ID de ejecución y huella de la solicitud; no conserva la pregunta en el registro de intentos fallidos. Un análisis exitoso también expone su marca de consentimiento. No existe consentimiento persistente: debe confirmarse en cada solicitud. La declaración es una propuesta técnica, no una política de privacidad revisada ni una afirmación de validez legal. La interfaz cliente debe presentarla claramente antes de enviar la solicitud.
 
 ## Limitaciones operativas conocidas
