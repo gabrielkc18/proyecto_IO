@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from rest_framework.throttling import ScopedRateThrottle
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from apps.workspaces.mixins import WorkspaceContextMixin
@@ -40,6 +41,8 @@ class ProblemaOptimizacionViewSet(
 ):
     queryset = Problema.objects.all()
     serializer_class = EjecucionSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "optimization"
 
     @action(
         detail=True,
@@ -51,6 +54,7 @@ class ProblemaOptimizacionViewSet(
             201: EjecucionSerializer,
             400: OpenApiResponse(description="El problema no se puede ejecutar."),
             404: OpenApiResponse(description="Problema no encontrado."),
+            429: OpenApiResponse(description="Límite de optimizaciones alcanzado."),
         },
         description=(
             "Ejecuta el problema del workspace activo. Requiere rol "

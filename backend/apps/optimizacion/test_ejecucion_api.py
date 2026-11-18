@@ -1,6 +1,10 @@
-from django.contrib.auth import get_user_model
-
 from decimal import Decimal
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.test import override_settings
+from rest_framework.throttling import ScopedRateThrottle
 
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -12,9 +16,16 @@ from apps.optimizacion.models import Ejecucion
 from apps.workspaces.test_utils import crear_workspace_prueba
 
 
+@override_settings(CACHES={
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "ejecutar-optimizacion-api-tests",
+    },
+})
 class EjecutarOptimizacionAPITests(APITestCase):
 
     def setUp(self):
+        cache.clear()
         self.user = get_user_model().objects.create_user(
             username="usuario_prueba",
             password="PruebaSegura123!"
@@ -106,3 +117,29 @@ class EjecutarOptimizacionAPITests(APITestCase):
         )
 
         self.assertIn("id", response.data)
+
+    def test_limite_por_usuario_impide_invocar_el_servicio(self):
+        ejecucion = Ejecucion.objects.create(problema=self.problema)
+
+        with (
+            patch(
+                "apps.optimizacion.views.ejecutar_optimizacion",
+                return_value=ejecucion,
+            ) as ejecutar,
+            patch.object(
+                ScopedRateThrottle,
+                "timer",
+                return_value=1000,
+            ) as reloj,
+        ):
+            for _ in range(10):
+                self.assertEqual(self.client.post(self.url).status_code, 201)
+
+            respuesta = self.client.post(self.url)
+            self.assertEqual(respuesta.status_code, 429)
+            self.assertEqual(respuesta["Retry-After"], "3600")
+            self.assertEqual(ejecutar.call_count, 10)
+            self.assertEqual(Ejecucion.objects.count(), 1)
+
+            reloj.return_value += 3600
+            self.assertEqual(self.client.post(self.url).status_code, 201)

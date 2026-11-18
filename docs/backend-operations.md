@@ -190,6 +190,8 @@ Consumo (`POST /api/consumos/`):
 
 `POST /api/problemas/{id}/ejecutar/` no requiere payload. `GET /api/ejecuciones/` y los endpoints de resultados son de consulta; sus serializers exponen los campos del recurso, incluyendo estado, fechas y valores calculados. No se permite crear o alterar ejecuciones/resultados mediante esos endpoints.
 
+La ejecución admite 10 solicitudes por hora por usuario autenticado, sumadas entre sus workspaces. Al alcanzar el límite, la API devuelve `429` con `Retry-After` antes de invocar CBC. Los intentos autenticados que fallan una validación posterior también consumen cuota. Bajo concurrencia la cuota de DRF es aproximada.
+
 Para las rutas de cuenta, las solicitudes JSON son:
 
 | Ruta | Payload |
