@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { SharedAppContext } from './context/SharedAppContext.jsx';
 import { NavItem, KPICard, ActivityItem, StepBadge, ThemeOption, ModalWrapper } from './components/common';
+import { OptimizationExecution, OptimizationHistory, OptimizationResults } from './components/optimization/OptimizationModule.jsx';
 import { 
   LayoutDashboard, 
   Cpu, 
@@ -71,25 +72,25 @@ const INITIAL_RESOURCES = [
 ];
 
 const INITIAL_CONSUMPTION = [
-  { id: 'c1', productId: '1', resourceId: '1', amount: 1.5 },
-  { id: 'c2', productId: '1', resourceId: '2', amount: 1.0 },
-  { id: 'c3', productId: '1', resourceId: '3', amount: 0.8 },
+  { id: 'c1', productId: '1', resourceId: '1', amount: 4 },
+  { id: 'c2', productId: '1', resourceId: '2', amount: 2 },
+  { id: 'c3', productId: '1', resourceId: '3', amount: 3 },
   
-  { id: 'c4', productId: '2', resourceId: '1', amount: 2.0 },
-  { id: 'c5', productId: '2', resourceId: '2', amount: 1.5 },
-  { id: 'c6', productId: '2', resourceId: '3', amount: 1.2 },
+  { id: 'c4', productId: '2', resourceId: '1', amount: 3 },
+  { id: 'c5', productId: '2', resourceId: '2', amount: 5 },
+  { id: 'c6', productId: '2', resourceId: '3', amount: 2 },
 
-  { id: 'c7', productId: '3', resourceId: '1', amount: 1.2 },
-  { id: 'c8', productId: '3', resourceId: '2', amount: 0.8 },
-  { id: 'c9', productId: '3', resourceId: '3', amount: 0.5 },
+  { id: 'c7', productId: '3', resourceId: '1', amount: 5 },
+  { id: 'c8', productId: '3', resourceId: '2', amount: 3 },
+  { id: 'c9', productId: '3', resourceId: '3', amount: 4 },
 
-  { id: 'c10', productId: '4', resourceId: '1', amount: 0.8 },
-  { id: 'c11', productId: '4', resourceId: '2', amount: 0.5 },
-  { id: 'c12', productId: '4', resourceId: '3', amount: 0.4 },
+  { id: 'c10', productId: '4', resourceId: '1', amount: 2 },
+  { id: 'c11', productId: '4', resourceId: '2', amount: 4 },
+  { id: 'c12', productId: '4', resourceId: '3', amount: 1 },
 
-  { id: 'c13', productId: '5', resourceId: '1', amount: 2.5 },
-  { id: 'c14', productId: '5', resourceId: '2', amount: 2.0 },
-  { id: 'c15', productId: '5', resourceId: '3', amount: 1.0 }
+  { id: 'c13', productId: '5', resourceId: '1', amount: 6 },
+  { id: 'c14', productId: '5', resourceId: '2', amount: 4 },
+  { id: 'c15', productId: '5', resourceId: '3', amount: 5 }
 ];
 
 const INITIAL_HISTORY = [
@@ -97,48 +98,48 @@ const INITIAL_HISTORY = [
     id: 'HIST-001',
     date: '26 ene 2026, 10:24',
     name: 'Mezcla de producción (Ej. 6)',
-    profit: 166000,
+    profit: 36000,
     status: 'Completado',
-    empiricalProfit: 64500,
-    bottlenecks: ['Materia Prima A', 'Horas Maquinado'],
+    baselineProfit: 30000,
+    bottlenecks: [],
     producedItems: [
-      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 0 },
-      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 200 },
-      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 0 },
+      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 100 },
+      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 100 },
+      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 50 },
       { code: 'P4', name: 'Producto 4 (Compacto)', quantity: 100 },
-      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 1200 }
+      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 50 }
     ]
   },
   {
     id: 'HIST-002',
     date: '25 ene 2026, 14:10',
     name: 'Escenario de referencia',
-    profit: 64500,
+    profit: 28800,
     status: 'Completado',
-    empiricalProfit: 60000,
-    bottlenecks: ['Materia Prima B'],
+    baselineProfit: null,
+    bottlenecks: [],
     producedItems: [
-      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 300 },
-      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 150 },
-      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 200 },
-      { code: 'P4', name: 'Producto 4 (Compacto)', quantity: 50 },
-      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 100 }
+      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 80 },
+      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 80 },
+      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 40 },
+      { code: 'P4', name: 'Producto 4 (Compacto)', quantity: 80 },
+      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 40 }
     ]
   },
   {
     id: 'HIST-003',
     date: '20 ene 2026, 09:32',
     name: 'Ajuste de recursos Q1',
-    profit: 142300,
+    profit: 43200,
     status: 'Completado',
-    empiricalProfit: 62000,
-    bottlenecks: ['Horas Maquinado'],
+    baselineProfit: null,
+    bottlenecks: [],
     producedItems: [
-      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 100 },
-      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 250 },
-      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 50 },
-      { code: 'P4', name: 'Producto 4 (Compacto)', quantity: 300 },
-      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 800 }
+      { code: 'P1', name: 'Producto 1 (Estándar)', quantity: 120 },
+      { code: 'P2', name: 'Producto 2 (Premium)', quantity: 120 },
+      { code: 'P3', name: 'Producto 3 (Económico)', quantity: 60 },
+      { code: 'P4', name: 'Producto 4 (Compacto)', quantity: 120 },
+      { code: 'P5', name: 'Producto 5 (Industrial)', quantity: 60 }
     ]
   }
 ];
@@ -183,6 +184,7 @@ export default function App() {
   const [optSubTab, setOptSubTab] = useState('productos'); // productos, recursos, consumos
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [currentResult, setCurrentResult] = useState(null);
+  const [optimizationError, setOptimizationError] = useState('');
 
   // Modals
   const [modalState, setModalState] = useState({ type: null, data: null }); // type: 'product', 'resource', 'consumption', 'delete'
@@ -194,30 +196,20 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // --- LP SOLVER SIMULATOR (SIMULATING PuLP / PYTHON BACKEND) ---
+  // --- Demonstration scenario only; this is not a mathematical optimizer. ---
   const runOptimization = () => {
-    if (products.length === 0 || resources.length === 0) {
-      showNotification('Se requieren al menos un producto y un recurso.', 'error');
+    if (products.length === 0 || resources.length === 0 || consumptions.length === 0) {
+      setOptimizationError('Agrega productos, recursos y reglas de consumo antes de iniciar.');
+      showNotification('Faltan datos para el escenario demostrativo.', 'error');
       return;
     }
-
+    setOptimizationError('');
     setIsOptimizing(true);
     setOptStep(2);
-
     setTimeout(() => {
-      // Linear Programming heuristic solver algorithm for realistic presentation
-      // Maximize Profit Z = sum(x_i * profit_i) subject to sum(x_i * cons_ij) <= capacity_j
-      // Demo deterministic outcome matching expected output
-      
-      const p5 = products.find(p => p.code === 'P5') ? 1200 : 0;
-      const p2 = products.find(p => p.code === 'P2') ? 200 : 0;
-      const p4 = products.find(p => p.code === 'P4') ? 100 : 0;
-
+      const demoQuantities = { P1: 100, P2: 100, P3: 50, P4: 100, P5: 50 };
       const produced = products.map(p => {
-        let q = 0;
-        if (p.code === 'P5') q = p5;
-        else if (p.code === 'P2') q = p2;
-        else if (p.code === 'P4') q = p4;
+        const q = demoQuantities[p.code] ?? 0;
         return {
           code: p.code,
           name: p.name,
@@ -234,74 +226,58 @@ export default function App() {
         let used = 0;
         products.forEach(p => {
           const prodItem = produced.find(pi => pi.code === p.code);
-          const cons = consumptions.find(c => c.productId === p.id && c.resourceId === res.id);
-          if (prodItem && cons) {
-            used += prodItem.quantity * cons.amount;
-          }
+          const perUnit = consumptions
+            .filter(c => c.productId === p.id && c.resourceId === res.id)
+            .reduce((sum, c) => sum + Number(c.amount), 0);
+          if (prodItem) used += prodItem.quantity * perUnit;
         });
-        const slack = res.capacity - used;
-        const isBottleneck = slack <= 0.001;
+        const rawSlack = res.capacity - used;
+        const slack = Math.max(0, Math.round(rawSlack * 100) / 100);
+        const isBottleneck = rawSlack <= 0.001;
         return {
           id: res.id,
           name: res.name,
           unit: res.unit,
           capacity: res.capacity,
+          rawUsed: used,
           used: Math.round(used * 10) / 10,
-          slack: Math.max(0, Math.round(slack * 10) / 10),
+          slack,
           isBottleneck
         };
       });
 
+      const exceeded = resourceUsage.filter(r => r.rawUsed > r.capacity + 0.001);
+      if (exceeded.length) {
+        setOptimizationError(`El escenario supera la capacidad de: ${exceeded.map(r => r.name).join(', ')}. Ajusta los datos para continuar.`);
+        setIsOptimizing(false);
+        setOptStep(1);
+        showNotification('El escenario supera la disponibilidad de recursos.', 'error');
+        return;
+      }
       const bottlenecks = resourceUsage.filter(r => r.isBottleneck).map(r => r.name);
-      
       const resultObj = {
-        id: `HIST-00${history.length + 1}`,
-        date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        name: `Optimización Mezcla ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`,
-        profit: totalProfit > 0 ? totalProfit : 166000,
-        empiricalProfit: 64500,
+        id: `DEMO-${Date.now()}`,
+        date: new Date().toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }),
+        name: `Escenario demostrativo ${new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`,
+        profit: totalProfit,
+        baselineProfit: null,
         produced,
         resourceUsage,
-        bottlenecks: bottlenecks.length > 0 ? bottlenecks : ['Materia Prima A', 'Horas Maquinado'],
-        status: 'Completado'
+        bottlenecks,
+        status: 'Completado',
+        solverStatus: 'demostrativo',
+        isDemonstration: true
       };
 
       setCurrentResult(resultObj);
       setHistory(prev => [resultObj, ...prev]);
       setIsOptimizing(false);
       setOptStep(3);
-      showNotification('¡Optimización de modelo finalizada con éxito!');
+      showNotification('Escenario demostrativo calculado.');
     }, 1800);
   };
 
-  // Pre-load default result if stepping into view direct
-  useEffect(() => {
-    if (!currentResult && history.length > 0) {
-      const defaultHist = history[0];
-      const produced = products.map(p => {
-        const item = defaultHist.producedItems?.find(pi => pi.code === p.code);
-        return {
-          code: p.code,
-          name: p.name,
-          profit: p.profit,
-          quantity: item ? item.quantity : (p.code === 'P5' ? 1200 : p.code === 'P2' ? 200 : p.code === 'P4' ? 100 : 0),
-          totalProfit: (item ? item.quantity : (p.code === 'P5' ? 1200 : p.code === 'P2' ? 200 : p.code === 'P4' ? 100 : 0)) * p.profit
-        };
-      });
-
-      const resourceUsage = [
-        { id: '1', name: 'Materia Prima A', unit: 'kg', capacity: 3000, used: 3000, slack: 0, isBottleneck: true },
-        { id: '2', name: 'Materia Prima B', unit: 'kg', capacity: 2500, used: 2500, slack: 0, isBottleneck: false },
-        { id: '3', name: 'Horas Maquinado', unit: 'h', capacity: 1600, used: 1600, slack: 0, isBottleneck: true }
-      ];
-
-      setCurrentResult({
-        ...defaultHist,
-        produced,
-        resourceUsage
-      });
-    }
-  }, [products, history]);
+  // Historical examples are illustrative only; execution results are never preloaded as solver output.
 
   // LOGIN SCREEN
   if (!isAuthenticated) {
@@ -470,7 +446,7 @@ export default function App() {
     <SharedAppContext.Provider value={{
       activeTab, setActiveTab, products, setProducts, resources, setResources,
       consumptions, setConsumptions, history, setHistory, currentResult,
-      setCurrentResult, showNotification
+      setCurrentResult, optStep, setOptStep, showNotification
     }}>
     <div className="min-h-screen bg-[#EFF6FF] flex text-slate-800 font-sans">
       
@@ -652,8 +628,7 @@ export default function App() {
                 />
                 <KPICard 
                   title="Última utilidad" 
-                  value={`$${(currentResult?.profit || 166000).toLocaleString()}`} 
-                  badge="+157.4%" 
+                  value={history.length ? `$${history[0].profit.toLocaleString()}` : '—'}
                   icon={<TrendingUp className="w-6 h-6 text-white" />} 
                   bgColor="bg-[#3B82F6]" 
                   textColor="text-white"
@@ -671,7 +646,7 @@ export default function App() {
                   </h3>
                   <div className="space-y-4">
                     <ActivityItem 
-                      title="Optimización completada" 
+                      title="Escenario demostrativo"
                       subtitle="Mezcla de producción (Ej. 6)" 
                       time="Hace 5 min" 
                     />
@@ -694,24 +669,20 @@ export default function App() {
                     <h3 className="font-bold text-[#172554] text-base flex items-center gap-2">
                       <BarChart2 className="w-5 h-5 text-[#3B82F6]" /> Utilidad comparativa
                     </h3>
-                    <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
-                      <TrendingUp className="w-3.5 h-3.5" /> +157.4% incremento
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5" /> Escenarios de ejemplo
                     </span>
                   </div>
 
                   <div className="h-56 w-full pt-4">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={[
-                        { name: 'Actual (empírico)', utilidad: 64500 },
-                        { name: 'Óptimo (PlanificaIO)', utilidad: 166000 }
-                      ]}>
+                      <BarChart data={[...history].reverse().map(item => ({ name: item.name, utilidad: item.profit }))}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                         <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748B' }} />
                         <YAxis tickFormatter={(val) => `$${val/1000}k`} tick={{ fontSize: 12, fill: '#64748B' }} />
                         <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Utilidad USD']} />
                         <Bar dataKey="utilidad" radius={[8, 8, 0, 0]} barSize={50}>
-                          <Cell fill="#DBEAFE" />
-                          <Cell fill="#3B82F6" />
+                          {history.map(item => <Cell key={item.id} fill={item.id === history[0]?.id ? '#3B82F6' : '#DBEAFE'} />)}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -729,7 +700,7 @@ export default function App() {
               <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-[#172554]">Optimización de la producción</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Define los datos, ejecuta el modelo lineal y obtén la mezcla óptima.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Define los datos y revisa un escenario de producción demostrativo.</p>
                 </div>
                 
                 {/* Visual Flow Stepper */}
@@ -738,7 +709,7 @@ export default function App() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                   <StepBadge number={2} label="Optimizar" active={optStep === 2} completed={optStep > 2} />
                   <ChevronRight className="w-4 h-4 text-gray-400" />
-                  <StepBadge number={3} label="Resultados" active={optStep === 3} completed={false} />
+                  <StepBadge number={3} label="Resultados" active={optStep === 3} completed={optStep >= 3} />
                 </div>
               </div>
 
@@ -945,7 +916,7 @@ export default function App() {
                     {/* BIG RUN OPTIMIZATION CALL TO ACTION */}
                     <div className="pt-6 border-t border-gray-100 flex justify-end">
                       <button
-                        onClick={runOptimization}
+                        onClick={() => { setOptimizationError(''); setOptStep(2); }}
                         className="px-8 py-3.5 bg-[#3B82F6] hover:bg-[#1E40AF] text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-500/30 flex items-center gap-3 transition-all transform hover:-translate-y-0.5"
                       >
                         <Play className="w-5 h-5 fill-current" /> OPTIMIZAR MODELO
@@ -956,268 +927,14 @@ export default function App() {
                 </div>
               )}
 
-              {/* STEP 2: SIMULATED EXECUTION / SPINNER */}
-              {optStep === 2 && (
-                <div className="bg-white rounded-2xl p-12 border border-blue-100 shadow-sm text-center space-y-6">
-                  <div className="relative w-20 h-20 mx-auto">
-                    <div className="w-20 h-20 border-4 border-blue-200 border-t-[#3B82F6] rounded-full animate-spin"></div>
-                    <Cpu className="w-8 h-8 text-[#3B82F6] absolute inset-0 m-auto animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-[#172554]">Ejecutando Modelo Matemático...</h3>
-                    <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                      Formulando modelo lineal, resolviendo sistema de restricciones e identificando cuellos de botella mediante solucionador Simplex / PuLP backend.
-                    </p>
-                  </div>
-                  <div className="w-64 h-2 bg-blue-100 rounded-full mx-auto overflow-hidden">
-                    <div className="h-full bg-[#3B82F6] animate-pulse w-3/4 rounded-full"></div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: OPTIMIZATION RESULTS VIEW */}
-              {optStep === 3 && currentResult && (
-                <div className="space-y-6">
-                  
-                  {/* Top KPI Results Summary */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    
-                    {/* Optimal Profit */}
-                    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-                        $
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilidad óptima</span>
-                        <h3 className="text-2xl font-extrabold text-[#172554]">${currentResult.profit.toLocaleString()}</h3>
-                      </div>
-                    </div>
-
-                    {/* Profit Increase */}
-                    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-blue-100 text-[#3B82F6] flex items-center justify-center font-bold">
-                        <TrendingUp className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Incremento estimado</span>
-                        <h3 className="text-2xl font-extrabold text-emerald-600">+157.4%</h3>
-                      </div>
-                    </div>
-
-                    {/* Bottlenecks Identified */}
-                    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
-                        <AlertTriangle className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Cuellos de botella</span>
-                        <p className="text-sm font-bold text-[#172554]">
-                          {currentResult.bottlenecks.join(' y ')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Two Columns Table Results */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Recommended Mix Table */}
-                    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-                      <h3 className="font-bold text-[#172554] text-sm flex items-center gap-2">
-                        <Package className="w-4 h-4 text-[#3B82F6]" /> Mezcla óptima de producción
-                      </h3>
-                      <div className="overflow-x-auto border border-blue-100 rounded-xl">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#EFF6FF] text-[#172554] font-semibold uppercase">
-                            <tr>
-                              <th className="p-3">Producto</th>
-                              <th className="p-3 text-right">Cantidad recomendada (u)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {currentResult.produced.map((item, idx) => (
-                              <tr key={idx} className="hover:bg-blue-50/40">
-                                <td className="p-3 font-semibold text-slate-700">{item.code} - {item.name}</td>
-                                <td className="p-3 text-right font-bold text-[#1E40AF]">
-                                  {item.quantity.toLocaleString()} u
-                                </td>
-                              </tr>
-                            ))}
-                            <tr className="bg-blue-50/60 font-bold">
-                              <td className="p-3 text-[#172554]">Total producción</td>
-                              <td className="p-3 text-right text-[#172554]">
-                                {currentResult.produced.reduce((s, i) => s + i.quantity, 0).toLocaleString()} u
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Resources Slack Table */}
-                    <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-[#172554] text-sm flex items-center gap-2">
-                          <Boxes className="w-4 h-4 text-[#3B82F6]" /> Uso de recursos (Holguras)
-                        </h3>
-                        <button 
-                          onClick={() => showNotification('Generando reporte PDF ejecutable...')}
-                          className="px-3 py-1.5 bg-[#EFF6FF] text-[#1E40AF] text-xs font-semibold rounded-lg hover:bg-blue-100 flex items-center gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5" /> Exportar PDF
-                        </button>
-                      </div>
-                      <div className="overflow-x-auto border border-blue-100 rounded-xl">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#EFF6FF] text-[#172554] font-semibold uppercase">
-                            <tr>
-                              <th className="p-3">Recurso</th>
-                              <th className="p-3 text-center">Uso</th>
-                              <th className="p-3 text-center">Disponibilidad</th>
-                              <th className="p-3 text-right">Holgura</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {currentResult.resourceUsage.map((r, idx) => (
-                              <tr key={idx} className="hover:bg-blue-50/40">
-                                <td className="p-3 font-semibold text-slate-700">{r.name}</td>
-                                <td className="p-3 text-center font-medium">{r.used.toLocaleString()} {r.unit}</td>
-                                <td className="p-3 text-center text-gray-500">{r.capacity.toLocaleString()} {r.unit}</td>
-                                <td className={`p-3 text-right font-bold ${r.slack === 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                  {r.slack === 0 ? '0 kg (Agotado)' : `${r.slack} ${r.unit}`}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* AI ANALYSIS CARD */}
-                  <div className="bg-gradient-to-br from-[#172554] to-[#1E40AF] p-6 rounded-2xl text-white shadow-lg space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-blue-500/30 flex items-center justify-center border border-blue-400/30">
-                        <Sparkles className="w-5 h-5 text-amber-300" />
-                      </div>
-                      <h3 className="font-bold text-base">Análisis de IA (Interpretación de PuLP)</h3>
-                    </div>
-                    <p className="text-xs text-blue-100 leading-relaxed">
-                      La solución matemática óptima recomienda priorizar la fabricación masiva del producto <strong className="text-white">P5 (1,200 unidades)</strong> seguido de <strong className="text-white">P2 (200 unidades)</strong> y <strong className="text-white">P4 (100 unidades)</strong>.
-                    </p>
-                    <p className="text-xs text-blue-100 leading-relaxed">
-                      Los recursos <strong className="text-white">Materia Prima A</strong> y <strong className="text-white">Horas Maquinado</strong> han alcanzado una holgura de 0, constituyendo los cuellos de botella activos del sistema. Se aconseja incrementar su abastecimiento para ampliar el margen de utilidad en posteriores escenarios.
-                    </p>
-                  </div>
-
-                  {/* Action Bar */}
-                  <div className="flex justify-between items-center pt-2">
-                    <button
-                      onClick={() => setOptStep(1)}
-                      className="px-5 py-2.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50"
-                    >
-                      ← Editar datos de entrada
-                    </button>
-                    <button
-                      onClick={() => { setActiveTab('historial'); showNotification('Resultados guardados en historial.'); }}
-                      className="px-6 py-2.5 bg-[#3B82F6] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl shadow"
-                    >
-                      Ver en historial de ejecuciones →
-                    </button>
-                  </div>
-
-                </div>
-              )}
+              {optStep === 2 && <OptimizationExecution isOptimizing={isOptimizing} error={optimizationError} onRun={runOptimization} />}
+              {optStep === 3 && currentResult && <OptimizationResults result={currentResult} onBack={() => setOptStep(1)} onHistory={() => { setActiveTab('historial'); showNotification('Ejecución demostrativa guardada en el historial.'); }} onExport={() => showNotification('La exportación estará disponible cuando se implemente la generación de archivos.', 'error')} />}
 
             </div>
           )}
 
           {/* 3. HISTORIAL VIEW */}
-          {activeTab === 'historial' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-[#172554]">Historial de ejecuciones</h2>
-                    <p className="text-xs text-gray-500">Consulta y compara las optimizaciones realizadas anteriormente.</p>
-                  </div>
-                  
-                  {/* Search and Filters */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1 sm:w-64">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar por escenario..."
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
-                      />
-                    </div>
-                    <select className="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white text-gray-700">
-                      <option value="todos">Todos los estados</option>
-                      <option value="completado">Completado</option>
-                      <option value="proceso">En proceso</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* History Table */}
-                <div className="overflow-x-auto border border-blue-100 rounded-xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#EFF6FF] text-[#172554] uppercase font-semibold">
-                      <tr>
-                        <th className="p-3.5">Fecha</th>
-                        <th className="p-3.5">Escenario</th>
-                        <th className="p-3.5">Utilidad (USD)</th>
-                        <th className="p-3.5">Estado</th>
-                        <th className="p-3.5 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {history.map((h) => (
-                        <tr key={h.id} className="hover:bg-blue-50/40">
-                          <td className="p-3.5 text-gray-500 font-medium">{h.date}</td>
-                          <td className="p-3.5 font-bold text-[#172554]">{h.name}</td>
-                          <td className="p-3.5 font-extrabold text-emerald-600">${h.profit.toLocaleString()}</td>
-                          <td className="p-3.5">
-                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">
-                              {h.status}
-                            </span>
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <button
-                              onClick={() => setHistoryDetailModal(h)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg inline-flex items-center gap-1 font-semibold"
-                            >
-                              <Eye className="w-4 h-4" /> Detalle
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Performance Growth Line Chart */}
-              <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-                <h3 className="font-bold text-[#172554] text-sm flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-[#3B82F6]" /> Comparativa de utilidades en el tiempo
-                </h3>
-                <div className="h-64 w-full pt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={[...history].reverse()}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748B' }} />
-                      <YAxis tickFormatter={(v) => `$${v/1000}k`} tick={{ fontSize: 10, fill: '#64748B' }} />
-                      <Tooltip formatter={(v) => [`$${Number(v).toLocaleString()}`, 'Utilidad Óptima']} />
-                      <Line type="monotone" dataKey="profit" stroke="#3B82F6" strokeWidth={3} dot={{ r: 6, fill: '#1E40AF' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeTab === 'historial' && <OptimizationHistory history={history} onDetail={setHistoryDetailModal} />}
 
           {/* 4. MI PERFIL VIEW */}
           {activeTab === 'perfil' && (
@@ -1565,11 +1282,19 @@ export default function App() {
             </div>
             <div>
               <span className="font-bold text-gray-700 block mb-1">Cuellos de botella reportados:</span>
-              <div className="flex gap-2">
-                {historyDetailModal.bottlenecks?.map((b, idx) => (
+              <div className="flex flex-wrap gap-2">
+                {historyDetailModal.bottlenecks?.length ? historyDetailModal.bottlenecks.map((b, idx) => (
                   <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[10px]">
                     {b}
                   </span>
+                )) : <span className="text-gray-500">Ninguno en este escenario.</span>}
+              </div>
+            </div>
+            <div>
+              <span className="font-bold text-gray-700 block mb-1">Mezcla de producción del escenario:</span>
+              <div className="space-y-1">
+                {(historyDetailModal.produced || historyDetailModal.producedItems || []).map(item => (
+                  <div key={item.code} className="flex justify-between"><span>{item.code} · {item.name}</span><span className="font-semibold">{item.quantity.toLocaleString()} u</span></div>
                 ))}
               </div>
             </div>
