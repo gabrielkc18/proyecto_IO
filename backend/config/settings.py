@@ -40,21 +40,21 @@ if IS_PRODUCTION and (DEBUG or not ALLOWED_HOSTS):
 
 
 # Application definition
-
 INSTALLED_APPS = [
-    # Django apps
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Apps de terceros
     'rest_framework',
     'drf_spectacular',
-    
-    #Apps del proyecto
+    'corsheaders',
+
+    # Apps del proyecto
     'apps.cuentas.apps.CuentasConfig',
     'apps.workspaces.apps.WorkspacesConfig',
     'apps.problemas.apps.ProblemasConfig',
@@ -66,6 +66,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -307,7 +308,7 @@ REST_FRAMEWORK = {
         "auth_login": "5/min",
         "auth_refresh": "30/min",
         "registration": "5/hour",
-        "email_verification": "5/hour",
+        "email_verification": "20/hour",
         "password_recovery": "3/hour",
         "password_change": "5/hour",
         "optimization": "10/hour",
@@ -382,3 +383,8 @@ LOGGING = {
         },
     },
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+]
