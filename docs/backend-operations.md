@@ -142,6 +142,7 @@ El problema de un producto o recurso se elige al crearlo. En una actualización 
 | `POST /api/workspaces/{workspace_id}/transferir-propiedad/` | Transferir a miembro activo; `{ "username": "usuario123" }` |
 | `POST /api/problemas/{id}/ejecutar/` | Ejecutar optimización de un problema |
 | `GET /api/ejecuciones/`, `GET /api/ejecuciones/{id}/` | Consultar ejecuciones |
+| `GET /api/ejecuciones/{id}/comparar/?contra={id}` | Comparar dos ejecuciones históricas óptimas del mismo problema |
 | `GET /api/resultados-productos/`, `GET /api/resultados-productos/{id}/` | Consultar resultados de productos |
 | `GET /api/resultados-recursos/`, `GET /api/resultados-recursos/{id}/` | Consultar resultados de recursos |
 | `GET /api/analisis-ia/`, `GET /api/analisis-ia/{id}/` | Consultar análisis |
@@ -196,6 +197,8 @@ Consumo (`POST /api/consumos/`):
 `POST /api/problemas/{id}/ejecutar/` no requiere payload. `GET /api/ejecuciones/` y los endpoints de resultados son de consulta; sus serializers exponen los campos del recurso, incluyendo estado, fechas y valores calculados. No se permite crear o alterar ejecuciones/resultados mediante esos endpoints.
 
 La ejecución admite 10 solicitudes por hora por usuario autenticado, sumadas entre sus workspaces. Al alcanzar el límite, la API devuelve `429` con `Retry-After` antes de invocar CBC. Los intentos autenticados que fallan una validación posterior también consumen cuota. Bajo concurrencia la cuota de DRF es aproximada.
+
+El comparador devuelve `base`, `contra`, `delta_utilidad_total` y filas históricas de `productos` y `recursos`. Los deltas son contra menos base y los decimales se representan como cadenas. Una fila presente en una sola ejecución tiene el otro lado y el delta en `null`; los recursos que cambiaron de unidad conservan ambos lados con delta `null`. La diferencia de utilidad es numérica, incluso si los sentidos objetivo difieren. Se devuelve `400` por parámetros inválidos o problemas distintos, `404` si alguna ejecución queda fuera del workspace activo y `409` si alguna no está terminada y óptima. Cualquier miembro del workspace puede consultar.
 
 Para las rutas de cuenta, las solicitudes JSON son:
 

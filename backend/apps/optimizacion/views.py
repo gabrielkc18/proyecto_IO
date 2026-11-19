@@ -1,16 +1,17 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.throttling import ScopedRateThrottle
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 
 from apps.workspaces.mixins import WorkspaceContextMixin
-from config.api import PlanningIdFilter, identificador_positivo
+from config.api import PlanningConflict, PlanningIdFilter, identificador_positivo
 from apps.problemas.models import Problema
 
 from .models import Ejecucion
-from .serializers import EjecucionSerializer
+from .serializers import ComparacionEjecucionesSerializer, EjecucionSerializer
+from .services.comparacion import comparar_ejecuciones
 from .services.ejecucion import ejecutar_optimizacion
 
 
@@ -31,6 +32,39 @@ class EjecucionViewSet(
         )
 
         return queryset.order_by("pk")
+
+    @extend_schema(
+        parameters=[OpenApiParameter("contra", int, required=True)],
+        responses={
+            200: ComparacionEjecucionesSerializer,
+            400: OpenApiResponse(description="Identificadores inválidos o problemas distintos."),
+            404: OpenApiResponse(description="Ejecución inexistente o fuera del workspace."),
+            409: OpenApiResponse(description="Las dos ejecuciones deben ser óptimas y terminadas."),
+        },
+        description="Compara datos históricos. Los deltas son contra menos base.",
+    )
+    @action(detail=True, methods=["get"], filter_backends=[])
+    def comparar(self, request, pk=None):
+        base_id = identificador_positivo(pk, "id")
+        contra_id = identificador_positivo(request.query_params.get("contra"), "contra")
+        ejecuciones = self.get_queryset().in_bulk([base_id, contra_id])
+        if base_id not in ejecuciones or contra_id not in ejecuciones:
+            raise NotFound("Una de las ejecuciones no está disponible en el Workspace activo.")
+
+        base, contra = ejecuciones[base_id], ejecuciones[contra_id]
+        if base_id == contra_id or base.problema_id != contra.problema_id:
+            raise ValidationError({
+                "contra": "Selecciona otra ejecución del mismo problema.",
+            })
+        if any(
+            ejecucion.estado_proceso != Ejecucion.EstadoProceso.TERMINADO
+            or ejecucion.estado_solver != Ejecucion.EstadoSolver.OPTIMAL
+            for ejecucion in (base, contra)
+        ):
+            raise PlanningConflict("Las dos ejecuciones deben ser óptimas y terminadas.")
+
+        comparacion = comparar_ejecuciones(base, contra)
+        return Response(ComparacionEjecucionesSerializer(comparacion).data)
 
 
 class ProblemaOptimizacionViewSet(
