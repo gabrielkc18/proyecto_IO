@@ -30,6 +30,11 @@ class RecursoSerializer(serializers.ModelSerializer):
                 "El problema no pertenece al Workspace activo."
             )
 
+        if self.instance is not None and value.pk != self.instance.problema_id:
+            raise serializers.ValidationError(
+                "El problema de un recurso existente no se puede cambiar."
+            )
+
         return value
 
     def validate_disponibilidad(self, value):

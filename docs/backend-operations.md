@@ -131,6 +131,8 @@ Solo usuarios activos pueden incorporarse o recibir propiedad. Retirar a un miem
 
 `/api/problemas/`, `/api/productos/`, `/api/recursos/` y `/api/consumos/` son colecciones con `GET` y `POST`; los detalles `/{id}/` permiten `GET`, `PUT`, `PATCH` y `DELETE`, sujetos al rol. El problema se asocia al workspace activo, no a un `workspace` arbitrario del body.
 
+El problema de un producto o recurso se elige al crearlo. En una actualización se permite enviar el mismo identificador y se rechaza un cambio de problema con `400` en el campo `problema`. Así se conservan los consumos y los vínculos del historial.
+
 | Método y ruta | Uso |
 |---|---|
 | `GET /api/workspaces/`, `GET /api/workspaces/{membership_id}/` | Membresías del usuario autenticado y workspace asociado |

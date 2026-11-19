@@ -17,6 +17,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "activo",
         ]
         read_only_fields = ["id"]
+        validators = []
 
     def validate_problema(self, value):
         workspace = self.context.get("workspace")
@@ -31,33 +32,32 @@ class ProductoSerializer(serializers.ModelSerializer):
                 "El problema no pertenece al Workspace seleccionado."
             )
 
+        if self.instance is not None and value.pk != self.instance.problema_id:
+            raise serializers.ValidationError(
+                "El problema de un producto existente no se puede cambiar."
+            )
+
         return value
 
-    def validate_codigo(self, value):
-        problema = self.initial_data.get("problema")
-
-        if problema is None:
-            return value
-
-        try:
-            problema_id = int(problema)
-        except (TypeError, ValueError):
-            return value
-
+    def validate(self, attrs):
+        if "codigo" not in attrs:
+            return attrs
+        problema = attrs.get("problema")
+        problema_id = problema.pk if problema is not None else self.instance.problema_id
         productos = Producto.objects.filter(
             problema_id=problema_id,
-            codigo=value,
+            codigo=attrs["codigo"],
         )
 
         if self.instance:
             productos = productos.exclude(pk=self.instance.pk)
 
         if productos.exists():
-            raise serializers.ValidationError(
-                "Ya existe un producto con ese código en este problema."
-            )
+            raise serializers.ValidationError({
+                "codigo": "Ya existe un producto con ese código en este problema."
+            })
 
-        return value
+        return attrs
 
     def validate_utilidad_unitaria(self, value):
         if value < 0:

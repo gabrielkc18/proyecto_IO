@@ -127,6 +127,17 @@ class ProductoAPITests(APITestCase):
             "Producto actualizado",
         )
 
+    def test_no_permite_reasignar_producto_a_otro_problema_del_workspace(self):
+        destino = crear_problema_prueba(self.workspace, nombre="Otro problema")
+        url = reverse("producto-detail", kwargs={"pk": self.producto.pk})
+
+        respuesta = self.client.patch(url, {"problema": destino.pk}, format="json")
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("problema", respuesta.data)
+        self.producto.refresh_from_db()
+        self.assertNotEqual(self.producto.problema_id, destino.pk)
+
     def test_eliminar_producto(self):
         url = reverse(
             "producto-detail",

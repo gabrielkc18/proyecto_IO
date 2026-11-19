@@ -139,6 +139,17 @@ class RecursoAPITests(APITestCase):
             3500
         )
 
+    def test_no_permite_reasignar_recurso_a_otro_problema_del_workspace(self):
+        destino = crear_problema_prueba(self.workspace, nombre="Otro problema")
+        url = reverse("recurso-detail", kwargs={"pk": self.recurso.pk})
+
+        respuesta = self.client.patch(url, {"problema": destino.pk}, format="json")
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("problema", respuesta.data)
+        self.recurso.refresh_from_db()
+        self.assertNotEqual(self.recurso.problema_id, destino.pk)
+
     def test_eliminar_recurso(self):
         url = reverse(
             "recurso-detail",
