@@ -49,6 +49,7 @@ Configura secretos y valores específicos del entorno fuera del repositorio:
 - `ACCOUNT_EMAIL_VERIFICATION_URL` y `ACCOUNT_PASSWORD_RESET_URL` con rutas HTTPS del cliente que gestione los enlaces, si se usa una aplicación web separada.
 - `GROQ_API_KEY` y `GROQ_MODEL` únicamente si se habilita el análisis de IA. La clave no debe registrarse ni quedar en el cliente.
 - `OPTIMIZATION_TIME_LIMIT_SECONDS`, `OPTIMIZATION_MAX_PRODUCTS`, `OPTIMIZATION_MAX_RESOURCES` y `GROQ_TIMEOUT_SECONDS`, dentro de límites operativos razonables.
+- `OPTIMIZATION_CBC_PATH` es opcional. Si el CBC incluido con `cbcbox` falla en el host, indica la ruta absoluta a un ejecutable CBC estable y valida la suite del solver. En Windows se verificó CBC oficial 2.10.13 de COIN-OR para los modelos que fallaban con el binario incluido.
 - `LOG_LEVEL` y `DJANGO_LOG_LEVEL` según el sistema de observabilidad del despliegue.
 
 La configuración activa HTTPS redirect, cookies seguras y HSTS por defecto en producción. `SECURE_HSTS_PRELOAD` queda desactivado; `check --deploy` reportará W021 hasta que el propietario del dominio y del despliegue decida habilitar preload, que puede tener efectos duraderos en navegadores. No se configura CORS: se espera mismo origen o un proxy controlado. Si TLS termina en un proxy, su cabecera de protocolo debe configurarse y confiarse explícitamente antes de habilitar la aplicación detrás de él. No publiques el servicio directamente a Internet hasta validar la configuración de proxy, TLS, correo y PostgreSQL.

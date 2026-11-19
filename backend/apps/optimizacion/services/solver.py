@@ -1,5 +1,6 @@
 
 import pulp
+from decouple import config
 
 
 def resolver_problema(
@@ -106,6 +107,7 @@ def resolver_problema(
     # 6. Ejecutar el solver
     stats = modelo.solve(
         pulp.COIN_CMD(
+            path=config("OPTIMIZATION_CBC_PATH", default="") or None,
             msg=False,
             timeLimit=time_limit,
         )

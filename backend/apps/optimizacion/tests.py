@@ -215,6 +215,10 @@ class SolverTest(SimpleTestCase):
     def test_timeout_del_solver_retorna_estado_no_resuelto(self):
         with (
             patch(
+                "apps.optimizacion.services.solver.config",
+                return_value="cbc-de-prueba",
+            ) as config,
+            patch(
                 "apps.optimizacion.services.solver.pulp.COIN_CMD",
             ) as solver_factory,
             patch(
@@ -229,7 +233,8 @@ class SolverTest(SimpleTestCase):
                 time_limit=7,
             )
 
-        solver_factory.assert_called_once_with(msg=False, timeLimit=7)
+        config.assert_called_once_with("OPTIMIZATION_CBC_PATH", default="")
+        solver_factory.assert_called_once_with(path="cbc-de-prueba", msg=False, timeLimit=7)
         solve.assert_called_once_with(solver_factory.return_value)
         self.assertEqual(resultado["estado"], "Not Solved")
         self.assertIsNone(resultado["utilidad_total"])
