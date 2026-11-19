@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 from apps.workspaces.models import Workspace, WorkspaceMembership
 from apps.cuentas.admin import PlanificaUserAdmin
 from apps.cuentas.models import PerfilCuenta
+from apps.cuentas.views import recuperacion_token, verificacion_token
 
 
 User = get_user_model()
@@ -48,6 +49,16 @@ class CuentaAPITests(APITestCase):
         if match is None:
             raise AssertionError("El correo no contiene un enlace.")
         return parse_qs(urlsplit(match.group()).query)
+
+    def test_tokens_de_cuenta_se_validan_por_proposito(self):
+        usuario = User.objects.create_user(username="cuenta_tokens")
+        token_correo = verificacion_token.make_token(usuario)
+        token_contrasena = recuperacion_token.make_token(usuario)
+
+        self.assertTrue(verificacion_token.check_token(usuario, token_correo))
+        self.assertTrue(recuperacion_token.check_token(usuario, token_contrasena))
+        self.assertFalse(verificacion_token.check_token(usuario, token_contrasena))
+        self.assertFalse(recuperacion_token.check_token(usuario, token_correo))
 
     def test_registration_atomically_creates_unprivileged_account_workspace_owner(self):
         response = self.client.post(

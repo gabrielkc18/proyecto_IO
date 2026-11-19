@@ -213,6 +213,8 @@ La ruta de confirmación de recuperación también acepta `GET` para mostrar el 
 
 Como los enlaces de verificación y recuperación llevan tokens temporales en la URL, configura el proxy y el servidor web para no conservar esos parámetros en logs de acceso ni reenviar la URL completa como `Referer`.
 
+Los tokens de verificación y recuperación tienen propósitos independientes. Si un usuario tiene un enlace emitido antes de esta separación, debe solicitar un enlace nuevo mediante el reenvío de verificación o la recuperación de contraseña, según corresponda.
+
 ### Consentimiento y privacidad de IA
 
 Cada solicitud requiere `consentimiento_confirmado: true`; omitirlo o enviarlo como `false` produce HTTP 400 antes de invocar Groq. Ejemplo:

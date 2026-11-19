@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import (
     ImproperlyConfigured,
     ValidationError as DjangoValidationError,
@@ -58,6 +58,18 @@ MENSAJE_RECUPERACION = (
     "Si la cuenta puede recuperar el acceso, recibirá instrucciones "
     "en el correo registrado."
 )
+
+
+class VerificacionCorreoTokenGenerator(PasswordResetTokenGenerator):
+    key_salt = "apps.cuentas.verificacion_correo"
+
+
+class RecuperacionContrasenaTokenGenerator(PasswordResetTokenGenerator):
+    key_salt = "apps.cuentas.recuperacion_contrasena"
+
+
+verificacion_token = VerificacionCorreoTokenGenerator()
+recuperacion_token = RecuperacionContrasenaTokenGenerator()
 
 
 def _detail_response_schema(name):
@@ -218,7 +230,7 @@ class RegistroAPIView(CuentaPublicaAPIView):
     @staticmethod
     def _enviar_verificacion(request, usuario):
         uid = urlsafe_base64_encode(force_bytes(usuario.pk))
-        token = default_token_generator.make_token(usuario)
+        token = verificacion_token.make_token(usuario)
         url = _url_accion(
             request,
             "ACCOUNT_EMAIL_VERIFICATION_URL",
@@ -320,7 +332,7 @@ class VerificarCorreoAPIView(CuentaPublicaAPIView):
         if (
             usuario is None
             or not usuario.is_active
-            or not default_token_generator.check_token(usuario, token)
+            or not verificacion_token.check_token(usuario, token)
         ):
             raise ValidationError(
                 {"detail": "El enlace de verificación no es válido o expiró."}
@@ -381,7 +393,7 @@ class SolicitarRestablecimientoAPIView(CuentaPublicaAPIView):
             and usuario.email
         ):
             uid = urlsafe_base64_encode(force_bytes(usuario.pk))
-            token = default_token_generator.make_token(usuario)
+            token = recuperacion_token.make_token(usuario)
             url = _url_accion(
                 request,
                 "ACCOUNT_PASSWORD_RESET_URL",
@@ -444,7 +456,7 @@ class ConfirmarRestablecimientoAPIView(CuentaPublicaAPIView):
             usuario is None
             or not usuario.is_active
             or not _correo_verificado(usuario)
-            or not default_token_generator.check_token(usuario, token)
+            or not recuperacion_token.check_token(usuario, token)
         ):
             raise ValidationError(
                 {"detail": "El enlace de recuperación no es válido o expiró."}
@@ -463,7 +475,7 @@ class ConfirmarRestablecimientoAPIView(CuentaPublicaAPIView):
             if (
                 not usuario.is_active
                 or not _correo_verificado(usuario)
-                or not default_token_generator.check_token(usuario, token)
+                or not recuperacion_token.check_token(usuario, token)
             ):
                 raise ValidationError(
                     {"detail": "El enlace de recuperación no es válido o expiró."}
