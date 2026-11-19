@@ -158,6 +158,8 @@ El problema de un producto o recurso se elige al crearlo. En una actualización 
 
 Los filtros disponibles son `problema` en productos, recursos, consumos, ejecuciones, resultados y análisis; `producto` y `recurso` en consumos; y `ejecucion` en resultados y análisis.
 
+Los filtros de identificadores aceptan enteros positivos. Un filtro presente con valor inválido devuelve `400` con el nombre del parámetro. Un intento de borrar un registro con historial protegido devuelve `409` con `detail`. Los duplicados detectados al validar devuelven `400`; si la restricción de unicidad se detecta al guardar, la API devuelve `409`.
+
 Las listas DRF usan páginas de 50 elementos por defecto. `?page=N` selecciona la página y `?page_size=N` permite entre 1 y 100 elementos. La respuesta contiene `count`, `next`, `previous` y `results`. El listado de miembros es un endpoint específico y devuelve una lista sin paginación.
 
 Errores comunes: 400 para datos inválidos o falta de contexto requerido, 401 para falta de autenticación/credenciales inválidas, 403 para rol insuficiente, 404 para recursos inexistentes o fuera del workspace activo, 409 para conflictos concurrentes/de integridad y 429 cuando se supera el throttling. Un error externo de Groq se devuelve como 502.

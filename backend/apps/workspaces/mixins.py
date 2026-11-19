@@ -2,6 +2,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import SAFE_METHODS
 
 from apps.workspaces.models import Workspace, WorkspaceMembership
+from config.api import identificador_positivo
 
 
 class WorkspaceContextMixin:
@@ -26,12 +27,7 @@ class WorkspaceContextMixin:
                 "workspace": "Debes enviar X-Workspace-ID."
             })
 
-        try:
-            workspace_id = int(workspace_id)
-        except (TypeError, ValueError):
-            raise ValidationError({
-                "workspace": "El identificador del Workspace no es válido."
-            })
+        workspace_id = identificador_positivo(workspace_id, "workspace")
 
         membership = WorkspaceMembership.objects.select_related(
             "workspace"

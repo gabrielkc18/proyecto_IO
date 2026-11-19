@@ -11,6 +11,7 @@ from drf_spectacular.utils import (
 )
 
 from apps.workspaces.mixins import WorkspaceContextMixin
+from config.api import PlanningIdFilter, identificador_positivo
 from apps.optimizacion.models import Ejecucion
 
 from .models import AnalisisIA
@@ -27,6 +28,11 @@ class AnalisisIAViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     serializer_class = AnalisisIASerializer
+    filter_backends = [PlanningIdFilter]
+    id_filters = {
+        "ejecucion": ("ejecucion_id",),
+        "problema": ("ejecucion__problema_id",),
+    }
 
     def get_queryset(self):
         queryset = AnalisisIA.objects.select_related(
@@ -36,17 +42,6 @@ class AnalisisIAViewSet(
         ).filter(
             ejecucion__problema__workspace=self.get_workspace()
         )
-
-        ejecucion_id = self.request.query_params.get("ejecucion")
-        problema_id = self.request.query_params.get("problema")
-
-        if ejecucion_id:
-            queryset = queryset.filter(ejecucion_id=ejecucion_id)
-
-        if problema_id:
-            queryset = queryset.filter(
-                ejecucion__problema_id=problema_id
-            )
 
         return queryset.order_by("pk")
 
@@ -96,7 +91,7 @@ class GenerarAnalisisAPIView(WorkspaceContextMixin, APIView):
         workspace = self.get_workspace()
 
         ejecucion = Ejecucion.objects.filter(
-            pk=ejecucion_id,
+            pk=identificador_positivo(ejecucion_id, "ejecucion_id"),
             problema__workspace=workspace,
         ).first()
 

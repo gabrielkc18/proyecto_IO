@@ -1,12 +1,13 @@
 from rest_framework import viewsets
 
 from apps.workspaces.mixins import WorkspaceContextMixin
+from config.api import PlanningWriteMixin
 
 from .models import Problema
 from .serializers import ProblemaSerializer
 
 
-class ProblemaViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
+class ProblemaViewSet(WorkspaceContextMixin, PlanningWriteMixin, viewsets.ModelViewSet):
     serializer_class = ProblemaSerializer
 
     def get_queryset(self):

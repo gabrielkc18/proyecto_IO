@@ -6,6 +6,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from apps.workspaces.mixins import WorkspaceContextMixin
+from config.api import PlanningIdFilter, identificador_positivo
 from apps.problemas.models import Problema
 
 from .models import Ejecucion
@@ -18,6 +19,8 @@ class EjecucionViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     serializer_class = EjecucionSerializer
+    filter_backends = [PlanningIdFilter]
+    id_filters = {"problema": ("problema_id",)}
 
     def get_queryset(self):
         queryset = Ejecucion.objects.select_related(
@@ -26,11 +29,6 @@ class EjecucionViewSet(
         ).filter(
             problema__workspace=self.get_workspace()
         )
-
-        problema_id = self.request.query_params.get("problema")
-
-        if problema_id:
-            queryset = queryset.filter(problema_id=problema_id)
 
         return queryset.order_by("pk")
 
@@ -50,6 +48,7 @@ class ProblemaOptimizacionViewSet(
         url_path="ejecutar",
     )
     @extend_schema(
+        request=None,
         responses={
             201: EjecucionSerializer,
             400: OpenApiResponse(description="El problema no se puede ejecutar."),
@@ -63,7 +62,7 @@ class ProblemaOptimizacionViewSet(
     )
     def ejecutar(self, request, pk=None):
         problema = Problema.objects.filter(
-            pk=pk,
+            pk=identificador_positivo(pk, "id"),
             workspace=self.get_workspace(),
         ).first()
 
