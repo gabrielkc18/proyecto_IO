@@ -1,3 +1,4 @@
+import { apiRequest } from './services/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
@@ -485,57 +486,63 @@ export default function App() {
               </form>
             ) : (
               <form
-                onSubmit={(e) => {
-                  e.preventDefault();
+                
+onSubmit={async (e) => {
+  e.preventDefault();
 
-                  const {
-                    nombre,
-                    apellido,
-                    username,
-                    email,
-                    rol,
-                    password,
-                    confirmPassword
-                  } = registerData;
+  const {
+    nombre,
+    apellido,
+    username,
+    email,
+    password,
+    confirmPassword
+  } = registerData;
 
-                  if (
-                    !nombre.trim() ||
-                    !apellido.trim() ||
-                    !username.trim() ||
-                    !email.trim() ||
-                    !password.trim() ||
-                    !confirmPassword.trim()
-                  ) {
-                    showNotification('Completa todos los campos.', 'error');
-                    return;
-                  }
+  if (
+    !nombre.trim() ||
+    !apellido.trim() ||
+    !username.trim() ||
+    !email.trim() ||
+    !password.trim() ||
+    !confirmPassword.trim()
+  ) {
+    showNotification('Completa todos los campos.', 'error');
+    return;
+  }
 
-                  if (password.length < 6) {
-                    showNotification('La contraseña debe tener al menos 6 caracteres.', 'error');
-                    return;
-                  }
+  if (password.length < 6) {
+    showNotification('La contraseña debe tener al menos 6 caracteres.', 'error');
+    return;
+  }
 
-                  if (password !== confirmPassword) {
-                    showNotification('Las contraseñas no coinciden.', 'error');
-                    return;
-                  }
+  if (password !== confirmPassword) {
+    showNotification('Las contraseñas no coinciden.', 'error');
+    return;
+  }
 
-                  const nombreCompleto = `${nombre.trim()} ${apellido.trim()}`;
+  try {
+    const respuesta = await apiRequest('/api/auth/registro/', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: username.trim(),
+        email: email.trim(),
+        password,
+        password_confirm: confirmPassword
+      })
+    });
 
-                  setUserProfile({
-                    name: nombreCompleto,
-                    username: username.trim(),
-                    email: email.trim(),
-                    role: rol,
-                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nombreCompleto)}&background=3B82F6&color=fff`
-                  });
+    showNotification(respuesta.detail || 'Registro exitoso. Verifica tu correo.');
 
-                  setEmail(email.trim());
-                  setPassword(password);
+    setAuthMode('login');
+    setEmail(username.trim());
+    setPassword('');
 
-                  setIsAuthenticated(true);
-                  showNotification(`¡Bienvenido/a a PlanificaIO, ${nombre.trim()}!`);
-                }}
+  } catch (error) {
+    showNotification(error.message, 'error');
+  }
+}}
+
                 className="space-y-4"
               >
                 <div>
