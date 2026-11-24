@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+from corsheaders.defaults import default_headers
 from decouple import config, Csv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -385,6 +386,14 @@ LOGGING = {
 }
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "x-workspace-id",
+    "x-refresh-token-cookie",
 ]

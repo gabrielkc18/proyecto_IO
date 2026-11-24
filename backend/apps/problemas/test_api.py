@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.problemas.models import Problema
+from apps.optimizacion.models import Ejecucion
 from apps.workspaces.test_utils import (
     crear_workspace_prueba,
     crear_problema_prueba,
@@ -114,6 +115,22 @@ class ProblemaAPITests(APITestCase):
 
         self.assertFalse(
             Problema.objects.filter(pk=self.problema.pk).exists()
+        )
+
+    def test_no_permite_eliminar_problema_con_ejecuciones(self):
+        Ejecucion.objects.create(problema=self.problema)
+        url = reverse(
+            "problema-detail",
+            kwargs={"pk": self.problema.pk},
+        )
+
+        response = self.client.delete(url)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertTrue(Problema.objects.filter(pk=self.problema.pk).exists())
+        self.assertEqual(
+            response.data["detail"],
+            "No se puede eliminar un problema que tiene ejecuciones registradas.",
         )
 
     def test_no_permite_listar_sin_workspace(self):

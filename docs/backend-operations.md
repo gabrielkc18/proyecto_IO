@@ -51,7 +51,7 @@ Configura secretos y valores específicos del entorno fuera del repositorio:
 - `OPTIMIZATION_TIME_LIMIT_SECONDS`, `OPTIMIZATION_MAX_PRODUCTS`, `OPTIMIZATION_MAX_RESOURCES` y `GROQ_TIMEOUT_SECONDS`, dentro de límites operativos razonables.
 - `LOG_LEVEL` y `DJANGO_LOG_LEVEL` según el sistema de observabilidad del despliegue.
 
-La configuración activa HTTPS redirect, cookies seguras y HSTS por defecto en producción. `SECURE_HSTS_PRELOAD` queda desactivado; `check --deploy` reportará W021 hasta que el propietario del dominio y del despliegue decida habilitar preload, que puede tener efectos duraderos en navegadores. No se configura CORS: se espera mismo origen o un proxy controlado. Si TLS termina en un proxy, su cabecera de protocolo debe configurarse y confiarse explícitamente antes de habilitar la aplicación detrás de él. No publiques el servicio directamente a Internet hasta validar la configuración de proxy, TLS, correo y PostgreSQL.
+La configuración activa HTTPS redirect, cookies seguras y HSTS por defecto en producción. `SECURE_HSTS_PRELOAD` queda desactivado; `check --deploy` reportará W021 hasta que el propietario del dominio y del despliegue decida habilitar preload, que puede tener efectos duraderos en navegadores. CORS permite explícitamente los orígenes locales de Vite en desarrollo y credenciales para la cookie de renovación; limita o amplía la lista de orígenes según el dominio del despliegue. Si TLS termina en un proxy, su cabecera de protocolo debe configurarse y confiarse explícitamente antes de habilitar la aplicación detrás de él. No publiques el servicio directamente a Internet hasta validar la configuración de proxy, TLS, correo y PostgreSQL.
 
 Secuencia orientativa de preparación de una instancia:
 
@@ -110,7 +110,7 @@ La generación utiliza `drf-spectacular` y PyYAML, fijados en `requirements.txt`
 
 ### Autenticación y workspace
 
-Los endpoints protegidos usan `Authorization: Bearer <access-token>`. Obtén y renueva tokens mediante `POST /api/token/` y `POST /api/token/refresh/`. El access token dura 15 minutos y el refresh token un día. Tras cambiar o restablecer la contraseña se revocan los tokens anteriores.
+Los endpoints protegidos usan `Authorization: Bearer <access-token>`. El frontend mantiene el access token solo en memoria y lo renueva al recargar o recibir 401. Para el transporte web, las solicitudes de `POST /api/token/` y `POST /api/token/refresh/` envían `X-Refresh-Token-Cookie: 1`: el access token se devuelve en JSON y el refresh token se persiste en la cookie `HttpOnly`, `SameSite=Lax`, con `Secure` habilitado en producción. `POST /api/auth/cerrar-sesion/` elimina la cookie. Los clientes no web pueden seguir enviando y recibiendo el refresh token en JSON. El access token dura 15 minutos y el refresh token un día. Tras cambiar o restablecer la contraseña se revocan los tokens anteriores.
 
 Los endpoints de recursos de workspace requieren `X-Workspace-ID` con un workspace al que el usuario pertenezca. El servidor resuelve el workspace desde la membresía autenticada; un valor enviado en el body no concede acceso. Los endpoints de miembros usan el ID de workspace de la ruta y validan de nuevo la membresía.
 
@@ -146,6 +146,7 @@ Solo usuarios activos pueden incorporarse o recibir propiedad. Retirar a un miem
 | `POST /api/auth/registro/` | Registro público y creación transaccional de workspace personal |
 | `GET /api/auth/perfil/` | Consultar perfil autenticado |
 | `POST /api/auth/cambiar-contrasena/` | Cambiar contraseña autenticado |
+| `POST /api/auth/cerrar-sesion/` | Eliminar la cookie de renovación del navegador |
 | `GET, POST /api/auth/verificar-correo/` | Mostrar confirmación y verificar correo |
 | `POST /api/auth/verificar-correo/reenviar/` | Reenviar verificación sin revelar datos de cuenta |
 | `POST /api/auth/recuperar-contrasena/` | Solicitar recuperación; respuesta genérica |
@@ -159,6 +160,8 @@ Los filtros disponibles son `problema` en productos, recursos, consumos, ejecuci
 Las listas DRF usan páginas de 50 elementos por defecto. `?page=N` selecciona la página y `?page_size=N` permite entre 1 y 100 elementos. La respuesta contiene `count`, `next`, `previous` y `results`. El listado de miembros es un endpoint específico y devuelve una lista sin paginación.
 
 Errores comunes: 400 para datos inválidos o falta de contexto requerido, 401 para falta de autenticación/credenciales inválidas, 403 para rol insuficiente, 404 para recursos inexistentes o fuera del workspace activo, 409 para conflictos concurrentes/de integridad y 429 cuando se supera el throttling. Un error externo de Groq se devuelve como 502.
+
+El registro solo confirma la creación si el backend de correo acepta el mensaje de verificación. Si no puede enviarlo, devuelve 503 y revierte el alta de usuario y workspace; en desarrollo, el backend de correo predeterminado imprime el mensaje en la consola.
 
 #### Payloads principales
 

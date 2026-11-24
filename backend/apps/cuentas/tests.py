@@ -49,6 +49,84 @@ class CuentaAPITests(APITestCase):
             raise AssertionError("El correo no contiene un enlace.")
         return parse_qs(urlsplit(match.group()).query)
 
+    def test_profile_patch_updates_first_and_last_name(self):
+        user = User.objects.create_user(
+            username="perfil_actualizado",
+            email="perfil@example.test",
+            password="ClaveFuerte2026!",
+        )
+        PerfilCuenta.objects.create(usuario=user, correo_verificado=True)
+        tokens = self.client.post(
+            self.login_url,
+            {
+                "username": user.username,
+                "password": "ClaveFuerte2026!",
+            },
+            format="json",
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {tokens.data['access']}",
+        )
+
+        response = self.client.patch(
+            reverse("account-profile"),
+            {"first_name": "Ana", "last_name": "Ceballos"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Ana")
+        self.assertEqual(user.last_name, "Ceballos")
+        self.assertEqual(response.data["first_name"], "Ana")
+        self.assertEqual(response.data["last_name"], "Ceballos")
+
+    def test_browser_token_transport_uses_httponly_refresh_cookie(self):
+        user = User.objects.create_user(
+            username="sesion_cookie",
+            password="ClaveFuerte2026!",
+        )
+        PerfilCuenta.objects.create(usuario=user, correo_verificado=True)
+
+        response = self.client.post(
+            self.login_url,
+            {
+                "username": user.username,
+                "password": "ClaveFuerte2026!",
+            },
+            format="json",
+            HTTP_X_REFRESH_TOKEN_COOKIE="1",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertNotIn("refresh", response.data)
+        refresh_cookie = response.cookies["planificai_refresh"]
+        self.assertTrue(refresh_cookie["httponly"])
+        self.assertEqual(refresh_cookie["samesite"], "Lax")
+
+        self.client.cookies["planificai_refresh"] = refresh_cookie.value
+        refresh_response = self.client.post(
+            reverse("token_refresh"),
+            {},
+            format="json",
+            HTTP_X_REFRESH_TOKEN_COOKIE="1",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refresh_response.data)
+        self.assertNotIn("refresh", refresh_response.data)
+
+        logout_response = self.client.post(
+            reverse("account-logout"),
+            {},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(
+            logout_response.cookies["planificai_refresh"].value,
+            "",
+        )
+
     def test_registration_atomically_creates_unprivileged_account_workspace_owner(self):
         response = self.client.post(
             self.register_url,
@@ -71,6 +149,21 @@ class CuentaAPITests(APITestCase):
             WorkspaceMembership.Rol.OWNER,
         )
         self.assertEqual(len(mail.outbox), 1)
+
+    @patch("apps.cuentas.views._enviar_correo", return_value=False)
+    def test_registration_rolls_back_if_verification_email_cannot_be_sent(
+        self,
+        _mock_send_email,
+    ):
+        response = self.client.post(
+            self.register_url,
+            self.register_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(username="nuevo_usuario").exists())
+        self.assertFalse(Workspace.objects.exists())
 
     def test_registration_rejects_bad_password_and_duplicate_username_without_partial_rows(self):
         bad_payload = self.register_payload()
