@@ -1,0 +1,1 @@
+"""Módulo analytics: comparador, sensibilidad y reportes."""
