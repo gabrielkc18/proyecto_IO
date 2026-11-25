@@ -1,0 +1,1 @@
+"""Módulo core: datos, validaciones y motor PuLP."""

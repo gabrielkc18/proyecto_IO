@@ -1,0 +1,31 @@
+﻿{
+  "PROBLEMA": {
+    "id": "EJ_3X4_CONT",
+    "nombre": "Ejemplo 3 productos x 4 recursos (continuo)",
+    "objetivo": "maximizar",
+    "descripcion": "Modelo PL/LP con variables continuas"
+  },
+  "PRODUCTO": [
+    {"id": "P1", "nombre": "Producto 1", "utilidad_unitaria": 40.0, "tipo_variable": "Continuous", "limite_inferior": 0},
+    {"id": "P2", "nombre": "Producto 2", "utilidad_unitaria": 30.0, "tipo_variable": "Continuous", "limite_inferior": 0},
+    {"id": "P3", "nombre": "Producto 3", "utilidad_unitaria": 50.0, "tipo_variable": "Continuous", "limite_inferior": 0}
+  ],
+  "RECURSO": [
+    {"id": "R1", "nombre": "Recurso 1", "disponibilidad": 100.0, "unidad": "u"},
+    {"id": "R2", "nombre": "Recurso 2", "disponibilidad": 80.0, "unidad": "u"},
+    {"id": "R3", "nombre": "Recurso 3", "disponibilidad": 120.0, "unidad": "u"},
+    {"id": "R4", "nombre": "Recurso 4", "disponibilidad": 60.0, "unidad": "u"}
+  ],
+  "CONSUMO_RECURSO": {
+    "R1": {"P1": 2, "P2": 1, "P3": 1},
+    "R2": {"P1": 1, "P2": 2, "P3": 1},
+    "R3": {"P1": 1, "P2": 1, "P3": 2},
+    "R4": {"P1": 1, "P2": 0.5, "P3": 1}
+  },
+  "RESTRICCIONES_ADICIONALES": [],
+  "ESCENARIO_BASE": {
+    "descripcion": "Escenario base de referencia",
+    "produccion": {"P1": 10, "P2": 10, "P3": 10},
+    "utilidad_reportada_enunciado": 1200
+  }
+}

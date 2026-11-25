@@ -28,3 +28,9 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Artefactos temporales/generados
+*.zip
+optimizacion/outputs/*.csv
+optimizacion/outputs/*.png
+optimizacion/outputs/contexto_ia.json

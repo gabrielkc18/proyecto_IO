@@ -1,0 +1,37 @@
+﻿{
+  "PROBLEMA": {
+    "id": "EJ_8X5_MILP",
+    "nombre": "Ejemplo 8 productos x 5 recursos (mixto MILP)",
+    "objetivo": "maximizar",
+    "descripcion": "Modelo MILP con variables enteras, continuas y binarias"
+  },
+  "PRODUCTO": [
+    {"id": "P1", "nombre": "Producto 1", "utilidad_unitaria": 20, "tipo_variable": "Integer", "limite_inferior": 0},
+    {"id": "P2", "nombre": "Producto 2", "utilidad_unitaria": 15, "tipo_variable": "Integer", "limite_inferior": 0},
+    {"id": "P3", "nombre": "Producto 3", "utilidad_unitaria": 25, "tipo_variable": "Continuous", "limite_inferior": 0},
+    {"id": "P4", "nombre": "Producto 4", "utilidad_unitaria": 10, "tipo_variable": "Continuous", "limite_inferior": 0},
+    {"id": "P5", "nombre": "Producto 5", "utilidad_unitaria": 30, "tipo_variable": "Integer", "limite_inferior": 0},
+    {"id": "P6", "nombre": "Producto 6", "utilidad_unitaria": 12, "tipo_variable": "Continuous", "limite_inferior": 0},
+    {"id": "P7", "nombre": "Producto 7", "utilidad_unitaria": 18, "tipo_variable": "Binary", "limite_inferior": 0},
+    {"id": "P8", "nombre": "Producto 8", "utilidad_unitaria": 22, "tipo_variable": "Binary", "limite_inferior": 0}
+  ],
+  "RECURSO": [
+    {"id": "R1", "nombre": "Recurso 1", "disponibilidad": 100, "unidad": "u"},
+    {"id": "R2", "nombre": "Recurso 2", "disponibilidad": 80, "unidad": "u"},
+    {"id": "R3", "nombre": "Recurso 3", "disponibilidad": 120, "unidad": "u"},
+    {"id": "R4", "nombre": "Recurso 4", "disponibilidad": 90, "unidad": "u"},
+    {"id": "R5", "nombre": "Recurso 5", "disponibilidad": 70, "unidad": "u"}
+  ],
+  "CONSUMO_RECURSO": {
+    "R1": {"P1": 2, "P2": 1, "P3": 3, "P4": 1, "P5": 2, "P6": 1, "P7": 5, "P8": 4},
+    "R2": {"P1": 1, "P2": 2, "P3": 1, "P4": 2, "P5": 1, "P6": 1, "P7": 3, "P8": 2},
+    "R3": {"P1": 2, "P2": 2, "P3": 1, "P4": 1, "P5": 3, "P6": 2, "P7": 2, "P8": 5},
+    "R4": {"P1": 1, "P2": 1, "P3": 2, "P4": 1, "P5": 1, "P6": 2, "P7": 4, "P8": 1},
+    "R5": {"P1": 1, "P2": 0, "P3": 1, "P4": 2, "P5": 2, "P6": 1, "P7": 1, "P8": 3}
+  },
+  "RESTRICCIONES_ADICIONALES": [
+    {"id": "MIN_P1", "nombre": "Minimo P1", "coeficientes": {"P1": 1}, "sentido": ">=", "valor_derecho": 2},
+    {"id": "MAX_P5", "nombre": "Maximo P5", "coeficientes": {"P5": 1}, "sentido": "<=", "valor_derecho": 10}
+  ],
+  "ESCENARIO_BASE": null
+}

@@ -1,0 +1,1 @@
+"""Paquete de optimización (PuLP) para el proyecto IO."""
