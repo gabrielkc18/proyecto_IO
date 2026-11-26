@@ -93,6 +93,19 @@ class EjecucionServiceTests(TestCase):
 
         self.assertEqual(Ejecucion.objects.count(), 0)
 
+    def test_producto_rentable_sin_consumo_no_crea_ejecucion(self):
+        Producto.objects.create(
+            problema=self.problema,
+            codigo="P2",
+            nombre="Producto 2",
+            utilidad_unitaria=Decimal("8.00"),
+        )
+
+        with self.assertRaisesRegex(ValueError, "P2"):
+            ejecutar_optimizacion(self.problema.id)
+
+        self.assertEqual(Ejecucion.objects.count(), 0)
+
     def test_sin_productos_activos_no_crea_ejecucion(self):
         self.producto.activo = False
         self.producto.save()

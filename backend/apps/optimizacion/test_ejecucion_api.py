@@ -106,3 +106,20 @@ class EjecutarOptimizacionAPITests(APITestCase):
         )
 
         self.assertIn("id", response.data)
+
+    def test_producto_rentable_sin_consumo_responde_400_sin_ejecucion(self):
+        Producto.objects.create(
+            problema=self.problema,
+            codigo="P2",
+            nombre="Producto 2",
+            utilidad_unitaria=Decimal("8.00"),
+        )
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn("P2", response.data["error"])
+        self.assertEqual(Ejecucion.objects.count(), 0)

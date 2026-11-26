@@ -78,6 +78,27 @@ def ejecutar_optimizacion(problema_id):
         ).select_related("producto", "recurso")
     )
 
+    if problema.sentido_objetivo == Problema.SentidoObjetivo.MAXIMIZAR:
+        productos_con_consumo_positivo = {
+            consumo.producto_id
+            for consumo in consumos_db
+            if consumo.cantidad_por_unidad > 0
+        }
+        productos_sin_limite = [
+            producto.codigo
+            for producto in productos_db
+            if producto.utilidad_unitaria > 0
+            and producto.pk not in productos_con_consumo_positivo
+        ]
+        if productos_sin_limite:
+            codigos = ", ".join(productos_sin_limite)
+            raise ValueError(
+                "No se puede maximizar: los productos "
+                f"{codigos} tienen utilidad positiva y no consumen ningún "
+                "recurso. Agrega al menos una regla de consumo positiva "
+                "para cada uno."
+            )
+
     # 3. Construir la estructura de consumos
     consumos_por_recurso = {
         recurso.id: {}
