@@ -58,12 +58,27 @@ MENSAJE_RECUPERACION = (
     "Si la cuenta puede recuperar el acceso, recibirá instrucciones "
     "en el correo registrado."
 )
+REFRESH_COOKIE_NAME = "planificai_refresh"
+REFRESH_COOKIE_PATH = "/api/token/"
+REFRESH_COOKIE_HEADER = "HTTP_X_REFRESH_TOKEN_COOKIE"
 
 
 def _detail_response_schema(name):
     return inline_serializer(
         name=name,
         fields={"detail": serializers.CharField()},
+    )
+
+
+def _establecer_cookie_refresh(response, token):
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        token,
+        max_age=int(api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=settings.SESSION_COOKIE_SECURE,
+        samesite="Lax",
+        path=REFRESH_COOKIE_PATH,
     )
 
 
@@ -88,7 +103,7 @@ def _enviar_correo(usuario, asunto, mensaje):
     if not usuario.email:
         return False
     try:
-        send_mail(
+        sent_count = send_mail(
             subject=asunto,
             message=mensaje,
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -106,6 +121,9 @@ def _enviar_correo(usuario, asunto, mensaje):
             type(error).__name__,
         )
         return False
+    if sent_count != 1:
+        logger.warning("El backend de correo no confirmó el envío.")
+        return False
     return True
 
 
@@ -117,14 +135,6 @@ def _obtener_usuario_de_token(uid):
         return None
 
 
-class TokenDeAccesoSerializer(TokenObtainPairSerializer):
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        if not _correo_verificado(self.user):
-            raise AuthenticationFailed("Credenciales inválidas.")
-        return data
-
-
 class TokenDeRenovacionSerializer(TokenRefreshSerializer):
     def validate(self, attrs):
         refresh = self.token_class(attrs["refresh"])
@@ -132,7 +142,7 @@ class TokenDeRenovacionSerializer(TokenRefreshSerializer):
         usuario = User.objects.filter(
             **{api_settings.USER_ID_FIELD: user_id}
         ).first()
-        if usuario is None or not usuario.is_active or not _correo_verificado(usuario):
+        if usuario is None or not usuario.is_active:
             raise AuthenticationFailed("Credenciales inválidas.")
         if api_settings.CHECK_REVOKE_TOKEN:
             token_hash = refresh.get(api_settings.REVOKE_TOKEN_CLAIM)
@@ -142,15 +152,58 @@ class TokenDeRenovacionSerializer(TokenRefreshSerializer):
 
 
 class AccountTokenObtainPairView(TokenObtainPairView):
-    serializer_class = TokenDeAccesoSerializer
+    serializer_class = TokenObtainPairSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_login"
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if request.META.get(REFRESH_COOKIE_HEADER) == "1":
+            refresh = response.data.pop("refresh", None)
+            if refresh:
+                _establecer_cookie_refresh(response, refresh)
+        return response
 
 
 class AccountTokenRefreshView(TokenRefreshView):
     serializer_class = TokenDeRenovacionSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_refresh"
+
+    def post(self, request, *args, **kwargs):
+        if request.META.get(REFRESH_COOKIE_HEADER) != "1":
+            return super().post(request, *args, **kwargs)
+
+        payload = request.data.copy()
+        refresh = payload.get("refresh") or request.COOKIES.get(
+            REFRESH_COOKIE_NAME
+        )
+        if refresh:
+            payload["refresh"] = refresh
+
+        serializer = self.get_serializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+        response = Response(serializer.validated_data, status=status.HTTP_200_OK)
+        rotated_refresh = response.data.pop("refresh", refresh)
+        if rotated_refresh:
+            _establecer_cookie_refresh(response, rotated_refresh)
+        return response
+
+    def handle_exception(self, exc):
+        response = super().handle_exception(exc)
+        if (
+            self.request.META.get(REFRESH_COOKIE_HEADER) == "1"
+            and response.status_code in {
+                status.HTTP_400_BAD_REQUEST,
+                status.HTTP_401_UNAUTHORIZED,
+            }
+        ):
+            response.delete_cookie(
+                REFRESH_COOKIE_NAME,
+                path=REFRESH_COOKIE_PATH,
+                samesite="Lax",
+            )
+        return response
 
 
 class CuentaPublicaAPIView(APIView):
@@ -187,6 +240,8 @@ class RegistroAPIView(CuentaPublicaAPIView):
                     username=datos["username"],
                     email=datos["email"],
                     password=datos["password"],
+                    first_name=datos.get("first_name", ""),
+                    last_name=datos.get("last_name", ""),
                 )
                 PerfilCuenta.objects.create(
                     usuario=usuario,
@@ -203,13 +258,9 @@ class RegistroAPIView(CuentaPublicaAPIView):
                 {"detail": "No fue posible completar el registro."}
             ) from error
 
-        self._enviar_verificacion(request, usuario)
         return Response(
             {
-                "detail": (
-                    "La cuenta fue creada. Verifica el correo antes "
-                    "de iniciar sesión."
-                ),
+                "detail": "La cuenta fue creada. Ya puedes iniciar sesión.",
                 "workspace_id": workspace.pk,
             },
             status=status.HTTP_201_CREATED,
@@ -226,7 +277,7 @@ class RegistroAPIView(CuentaPublicaAPIView):
             uid,
             token,
         )
-        _enviar_correo(
+        return _enviar_correo(
             usuario,
             "Verifica tu cuenta de PlanificaIO",
             "Para verificar tu cuenta, abre este enlace y confirma la "
@@ -243,6 +294,17 @@ class PerfilAPIView(APIView):
         responses={200: PerfilSerializer},
     )
     def get(self, request):
+        return Response(PerfilSerializer(request.user).data)
+
+    @extend_schema(
+        tags=["Cuentas"],
+        request=PerfilSerializer,
+        responses={200: PerfilSerializer},
+    )
+    def patch(self, request):
+        serializer = PerfilSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(PerfilSerializer(request.user).data)
 
 
@@ -279,6 +341,21 @@ class CambioContrasenaAPIView(APIView):
         return Response(
             {"detail": "La contraseña fue actualizada. Inicia sesión de nuevo."}
         )
+
+
+class CerrarSesionAPIView(CuentaPublicaAPIView):
+    @extend_schema(
+        tags=["Cuentas"],
+        responses={204: OpenApiResponse(description="Sesión cerrada.")},
+    )
+    def post(self, request):
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie(
+            REFRESH_COOKIE_NAME,
+            path=REFRESH_COOKIE_PATH,
+            samesite="Lax",
+        )
+        return response
 
 
 class VerificarCorreoAPIView(CuentaPublicaAPIView):
@@ -377,7 +454,6 @@ class SolicitarRestablecimientoAPIView(CuentaPublicaAPIView):
         ).first()
         if (
             usuario is not None
-            and _correo_verificado(usuario)
             and usuario.email
         ):
             uid = urlsafe_base64_encode(force_bytes(usuario.pk))
@@ -443,7 +519,6 @@ class ConfirmarRestablecimientoAPIView(CuentaPublicaAPIView):
         if (
             usuario is None
             or not usuario.is_active
-            or not _correo_verificado(usuario)
             or not default_token_generator.check_token(usuario, token)
         ):
             raise ValidationError(
@@ -462,7 +537,6 @@ class ConfirmarRestablecimientoAPIView(CuentaPublicaAPIView):
             usuario = User.objects.select_for_update().get(pk=usuario.pk)
             if (
                 not usuario.is_active
-                or not _correo_verificado(usuario)
                 or not default_token_generator.check_token(usuario, token)
             ):
                 raise ValidationError(

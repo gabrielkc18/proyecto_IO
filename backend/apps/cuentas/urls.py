@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     CambioContrasenaAPIView,
+    CerrarSesionAPIView,
     ConfirmarRestablecimientoAPIView,
     PerfilAPIView,
     RegistroAPIView,
@@ -14,6 +15,11 @@ from .views import (
 urlpatterns = [
     path("auth/registro/", RegistroAPIView.as_view(), name="account-register"),
     path("auth/perfil/", PerfilAPIView.as_view(), name="account-profile"),
+    path(
+        "auth/cerrar-sesion/",
+        CerrarSesionAPIView.as_view(),
+        name="account-logout",
+    ),
     path(
         "auth/cambiar-contrasena/",
         CambioContrasenaAPIView.as_view(),

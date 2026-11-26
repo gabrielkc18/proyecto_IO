@@ -11,6 +11,16 @@ User = get_user_model()
 
 
 class RegistroSerializer(serializers.Serializer):
+    first_name = serializers.CharField(
+        max_length=150,
+        required=False,
+        allow_blank=True,
+    )
+    last_name = serializers.CharField(
+        max_length=150,
+        required=False,
+        allow_blank=True,
+    )
     username = serializers.CharField(
         max_length=User._meta.get_field("username").max_length,
         validators=[UnicodeUsernameValidator()],

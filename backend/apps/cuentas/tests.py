@@ -8,6 +8,8 @@ from django.core.cache import cache
 from django.core import mail
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -49,6 +51,84 @@ class CuentaAPITests(APITestCase):
             raise AssertionError("El correo no contiene un enlace.")
         return parse_qs(urlsplit(match.group()).query)
 
+    def test_profile_patch_updates_first_and_last_name(self):
+        user = User.objects.create_user(
+            username="perfil_actualizado",
+            email="perfil@example.test",
+            password="ClaveFuerte2026!",
+        )
+        PerfilCuenta.objects.create(usuario=user, correo_verificado=True)
+        tokens = self.client.post(
+            self.login_url,
+            {
+                "username": user.username,
+                "password": "ClaveFuerte2026!",
+            },
+            format="json",
+        )
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {tokens.data['access']}",
+        )
+
+        response = self.client.patch(
+            reverse("account-profile"),
+            {"first_name": "Ana", "last_name": "Ceballos"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Ana")
+        self.assertEqual(user.last_name, "Ceballos")
+        self.assertEqual(response.data["first_name"], "Ana")
+        self.assertEqual(response.data["last_name"], "Ceballos")
+
+    def test_browser_token_transport_uses_httponly_refresh_cookie(self):
+        user = User.objects.create_user(
+            username="sesion_cookie",
+            password="ClaveFuerte2026!",
+        )
+        PerfilCuenta.objects.create(usuario=user, correo_verificado=True)
+
+        response = self.client.post(
+            self.login_url,
+            {
+                "username": user.username,
+                "password": "ClaveFuerte2026!",
+            },
+            format="json",
+            HTTP_X_REFRESH_TOKEN_COOKIE="1",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertNotIn("refresh", response.data)
+        refresh_cookie = response.cookies["planificai_refresh"]
+        self.assertTrue(refresh_cookie["httponly"])
+        self.assertEqual(refresh_cookie["samesite"], "Lax")
+
+        self.client.cookies["planificai_refresh"] = refresh_cookie.value
+        refresh_response = self.client.post(
+            reverse("token_refresh"),
+            {},
+            format="json",
+            HTTP_X_REFRESH_TOKEN_COOKIE="1",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refresh_response.data)
+        self.assertNotIn("refresh", refresh_response.data)
+
+        logout_response = self.client.post(
+            reverse("account-logout"),
+            {},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(
+            logout_response.cookies["planificai_refresh"].value,
+            "",
+        )
+
     def test_registration_atomically_creates_unprivileged_account_workspace_owner(self):
         response = self.client.post(
             self.register_url,
@@ -62,6 +142,7 @@ class CuentaAPITests(APITestCase):
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
         self.assertFalse(user.perfil_cuenta.correo_verificado)
+        self.assertEqual(len(mail.outbox), 0)
         workspace = Workspace.objects.get(propietario=user)
         self.assertEqual(
             WorkspaceMembership.objects.get(
@@ -70,7 +151,26 @@ class CuentaAPITests(APITestCase):
             ).rol,
             WorkspaceMembership.Rol.OWNER,
         )
-        self.assertEqual(len(mail.outbox), 1)
+
+    @patch("apps.cuentas.views.RegistroAPIView._enviar_verificacion")
+    def test_registration_does_not_depend_on_email_delivery(
+        self,
+        mock_send_verification,
+    ):
+        response = self.client.post(
+            self.register_url,
+            self.register_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_send_verification.assert_not_called()
+        self.assertTrue(User.objects.filter(username="nuevo_usuario").exists())
+        self.assertTrue(
+            Workspace.objects.filter(
+                propietario__username="nuevo_usuario",
+            ).exists()
+        )
 
     def test_registration_rejects_bad_password_and_duplicate_username_without_partial_rows(self):
         bad_payload = self.register_payload()
@@ -127,34 +227,32 @@ class CuentaAPITests(APITestCase):
             ).exists()
         )
 
-    def test_unverified_account_cannot_obtain_jwt_until_email_is_verified(self):
+    def test_unverified_account_can_login_and_refresh_without_confirmation(self):
         self.client.post(
             self.register_url,
             self.register_payload(),
             format="json",
         )
-        credentials = {
-            "username": "nuevo_usuario",
-            "password": "PlanificaFuerte2026!",
-        }
-        response = self.client.post(self.login_url, credentials, format="json")
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-        token_data = self.token_from_last_email()
-        response = self.client.post(
-            self.verify_url,
-            {"uid": token_data["uid"][0], "token": token_data["token"][0]},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(
+        self.assertFalse(
             PerfilCuenta.objects.get(
                 usuario__username="nuevo_usuario",
             ).correo_verificado
         )
+        self.assertEqual(len(mail.outbox), 0)
 
-        response = self.client.post(self.login_url, credentials, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        credentials = {
+            "username": "nuevo_usuario",
+            "password": "PlanificaFuerte2026!",
+        }
+        tokens = self.client.post(self.login_url, credentials, format="json")
+        self.assertEqual(tokens.status_code, status.HTTP_200_OK)
+
+        refresh_response = self.client.post(
+            reverse("token_refresh"),
+            {"refresh": tokens.data["refresh"]},
+            format="json",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
 
     def test_verification_rejects_invalid_token_without_activating_profile(self):
         self.client.post(
@@ -162,10 +260,13 @@ class CuentaAPITests(APITestCase):
             self.register_payload(),
             format="json",
         )
-        token_data = self.token_from_last_email()
+        user = User.objects.get(username="nuevo_usuario")
         response = self.client.post(
             self.verify_url,
-            {"uid": token_data["uid"][0], "token": "invalid"},
+            {
+                "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+                "token": "invalid",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -195,7 +296,7 @@ class CuentaAPITests(APITestCase):
         self.assertEqual(existing.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(unknown.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(existing.data, unknown.data)
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 1)
 
         token_data = self.token_from_last_email()
         verification = self.client.post(
@@ -211,7 +312,7 @@ class CuentaAPITests(APITestCase):
             email="recovery@example.test",
             password="ClaveFuerte2026!",
         )
-        PerfilCuenta.objects.create(usuario=user, correo_verificado=True)
+        PerfilCuenta.objects.create(usuario=user, correo_verificado=False)
 
         existing = self.client.post(
             self.reset_request_url,
