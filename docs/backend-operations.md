@@ -21,6 +21,8 @@ Reemplaza `SECRET_KEY` por un valor aleatorio privado. No incluyas `.env`, clave
 .venv/bin/python manage.py runserver
 ```
 
+Las tareas de VS Code del workspace usan `127.0.0.1:8001` para el backend y configuran Vite con `VITE_API_URL=http://127.0.0.1:8001`. Si ejecutas los servidores manualmente en otros puertos, ajusta `VITE_API_URL` y los orígenes permitidos en `CORS_ALLOWED_ORIGINS` para que coincidan.
+
 El backend lee su configuración desde variables de entorno y `.env` mediante `python-decouple`. `.env.example` contiene solo valores de muestra. En desarrollo, el correo se imprime en consola por defecto.
 
 ## PostgreSQL
@@ -39,6 +41,25 @@ cd backend
 
 El entorno de desarrollo puede usar SQLite. En producción, el backend rechaza SQLite y requiere `DJANGO_ENV=production`, `DEBUG=False` y `ALLOWED_HOSTS` explícito. La aplicación usa `select_for_update()` en cambios sensibles de membresías y en el aprovisionamiento de workspaces; esos bloqueos requieren validación en PostgreSQL, pues SQLite no ofrece el mismo bloqueo de filas.
 
+### Correo de cuenta en desarrollo
+
+El registro y el inicio de sesión no requieren confirmar el correo y el registro no envía mensajes. El `.env` local usa `django.core.mail.backends.console.EmailBackend` por defecto; ese backend no entrega mensajes a una bandeja y solo imprime en la terminal los correos que se soliciten, como la recuperación de contraseña o la confirmación opcional de una cuenta antigua.
+
+Para entregar correos de cuenta con Gmail, crea una contraseña de aplicación de Google (con la verificación en dos pasos habilitada) y configura estas variables en `backend/.env`, reemplazando la dirección por la cuenta que genera esa contraseña:
+
+```dotenv
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=tu-cuenta@gmail.com
+EMAIL_HOST_PASSWORD=tu-contrasena-de-aplicacion
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+DEFAULT_FROM_EMAIL=PlanificaIO <tu-cuenta@gmail.com>
+```
+
+Usa la contraseña de aplicación, no la contraseña normal de Google; introdúcela sin los espacios de formato que Google pueda mostrar. Mantén las credenciales solo en el `.env` local, reinicia el backend tras guardarlas y prueba con una cuenta cuyo correo puedas consultar. En desarrollo, `ACCOUNT_EMAIL_VERIFICATION_URL` puede quedar vacío: el enlace abre la pantalla de confirmación servida por la API.
+
 ## Variables de producción
 
 Configura secretos y valores específicos del entorno fuera del repositorio:
@@ -51,7 +72,7 @@ Configura secretos y valores específicos del entorno fuera del repositorio:
 - `OPTIMIZATION_TIME_LIMIT_SECONDS`, `OPTIMIZATION_MAX_PRODUCTS`, `OPTIMIZATION_MAX_RESOURCES` y `GROQ_TIMEOUT_SECONDS`, dentro de límites operativos razonables.
 - `LOG_LEVEL` y `DJANGO_LOG_LEVEL` según el sistema de observabilidad del despliegue.
 
-La configuración activa HTTPS redirect, cookies seguras y HSTS por defecto en producción. `SECURE_HSTS_PRELOAD` queda desactivado; `check --deploy` reportará W021 hasta que el propietario del dominio y del despliegue decida habilitar preload, que puede tener efectos duraderos en navegadores. No se configura CORS: se espera mismo origen o un proxy controlado. Si TLS termina en un proxy, su cabecera de protocolo debe configurarse y confiarse explícitamente antes de habilitar la aplicación detrás de él. No publiques el servicio directamente a Internet hasta validar la configuración de proxy, TLS, correo y PostgreSQL.
+La configuración activa HTTPS redirect, cookies seguras y HSTS por defecto en producción. `SECURE_HSTS_PRELOAD` queda desactivado; `check --deploy` reportará W021 hasta que el propietario del dominio y del despliegue decida habilitar preload, que puede tener efectos duraderos en navegadores. CORS permite explícitamente los orígenes locales de Vite en desarrollo y credenciales para la cookie de renovación; limita o amplía la lista de orígenes según el dominio del despliegue. Si TLS termina en un proxy, su cabecera de protocolo debe configurarse y confiarse explícitamente antes de habilitar la aplicación detrás de él. No publiques el servicio directamente a Internet hasta validar la configuración de proxy, TLS, correo y PostgreSQL.
 
 Secuencia orientativa de preparación de una instancia:
 
@@ -110,7 +131,7 @@ La generación utiliza `drf-spectacular` y PyYAML, fijados en `requirements.txt`
 
 ### Autenticación y workspace
 
-Los endpoints protegidos usan `Authorization: Bearer <access-token>`. Obtén y renueva tokens mediante `POST /api/token/` y `POST /api/token/refresh/`. El access token dura 15 minutos y el refresh token un día. Tras cambiar o restablecer la contraseña se revocan los tokens anteriores.
+Los endpoints protegidos usan `Authorization: Bearer <access-token>`. El frontend mantiene el access token solo en memoria y lo renueva al recargar o recibir 401. Para el transporte web, las solicitudes de `POST /api/token/` y `POST /api/token/refresh/` envían `X-Refresh-Token-Cookie: 1`: el access token se devuelve en JSON y el refresh token se persiste en la cookie `HttpOnly`, `SameSite=Lax`, con `Secure` habilitado en producción. `POST /api/auth/cerrar-sesion/` elimina la cookie. Los clientes no web pueden seguir enviando y recibiendo el refresh token en JSON. El access token dura 15 minutos y el refresh token un día. Tras cambiar o restablecer la contraseña se revocan los tokens anteriores.
 
 Los endpoints de recursos de workspace requieren `X-Workspace-ID` con un workspace al que el usuario pertenezca. El servidor resuelve el workspace desde la membresía autenticada; un valor enviado en el body no concede acceso. Los endpoints de miembros usan el ID de workspace de la ruta y validan de nuevo la membresía.
 
@@ -146,8 +167,9 @@ Solo usuarios activos pueden incorporarse o recibir propiedad. Retirar a un miem
 | `POST /api/auth/registro/` | Registro público y creación transaccional de workspace personal |
 | `GET /api/auth/perfil/` | Consultar perfil autenticado |
 | `POST /api/auth/cambiar-contrasena/` | Cambiar contraseña autenticado |
-| `GET, POST /api/auth/verificar-correo/` | Mostrar confirmación y verificar correo |
-| `POST /api/auth/verificar-correo/reenviar/` | Reenviar verificación sin revelar datos de cuenta |
+| `POST /api/auth/cerrar-sesion/` | Eliminar la cookie de renovación del navegador |
+| `GET, POST /api/auth/verificar-correo/` | Confirmación opcional de correo |
+| `POST /api/auth/verificar-correo/reenviar/` | Reenvío opcional para cuentas antiguas, sin revelar datos de cuenta |
 | `POST /api/auth/recuperar-contrasena/` | Solicitar recuperación; respuesta genérica |
 | `GET, POST /api/auth/recuperar-contrasena/confirmar/` | Mostrar formulario y confirmar recuperación |
 | `POST /api/token/`, `POST /api/token/refresh/` | Obtener o renovar JWT |
@@ -159,6 +181,8 @@ Los filtros disponibles son `problema` en productos, recursos, consumos, ejecuci
 Las listas DRF usan páginas de 50 elementos por defecto. `?page=N` selecciona la página y `?page_size=N` permite entre 1 y 100 elementos. La respuesta contiene `count`, `next`, `previous` y `results`. El listado de miembros es un endpoint específico y devuelve una lista sin paginación.
 
 Errores comunes: 400 para datos inválidos o falta de contexto requerido, 401 para falta de autenticación/credenciales inválidas, 403 para rol insuficiente, 404 para recursos inexistentes o fuera del workspace activo, 409 para conflictos concurrentes/de integridad y 429 cuando se supera el throttling. Un error externo de Groq se devuelve como 502.
+
+El registro crea la cuenta y su workspace personal sin enviar correo; el usuario puede iniciar sesión inmediatamente. La recuperación de contraseña sí necesita un backend de correo configurado para entregar sus instrucciones.
 
 #### Payloads principales
 
